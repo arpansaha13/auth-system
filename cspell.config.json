@@ -1,0 +1,48 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "arpansaha",
+    "bcrypt",
+    "dbname",
+    "dotenv",
+    "golang",
+    "gorm",
+    "goroutine",
+    "goroutines",
+    "grpc",
+    "interceptor",
+    "interceptors",
+    "maxage",
+    "minage",
+    "otps",
+    "postgres",
+    "protobuf",
+    "protoc",
+    "repo",
+    "repos",
+    "sslmode",
+    "testcontainers",
+    "unary",
+    "uuid",
+    "validator"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    ".git/**",
+    "bin/**",
+    "vendor/**",
+    "*.pb.go",
+    "*.pb.gw.go",
+    "db/migrations/**"
+  ],
+  "dictionaries": [
+    "go",
+    "softwareTerms",
+    "typescript",
+    "node",
+    "bash",
+    "docker"
+  ],
+  "import": []
+}

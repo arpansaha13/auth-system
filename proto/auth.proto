@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package auth;
+option go_package = "./pb";
+
+import "google/protobuf/timestamp.proto";
+
+service AuthService {
+    rpc Signup(SignupRequest) returns (SignupResponse);
+    rpc VerifyOTP(VerifyOTPRequest) returns (VerifyOTPResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+    rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
+}
+
+message SignupRequest {
+    string email = 1;
+    string password = 2;
+}
+
+message SignupResponse {
+    string message = 1;
+    string user_id = 2;
+}
+
+message VerifyOTPRequest {
+    string user_id = 1;
+    string code = 2;
+}
+
+message VerifyOTPResponse {
+    string message = 1;
+    string username = 2; // Returns the newly generated username
+    string session_token = 3;
+}
+
+message LoginRequest {
+    string email = 1;
+    string password = 2;
+}
+
+message LoginResponse {
+    string session_token = 1;
+    google.protobuf.Timestamp expires_at = 2;
+}
+
+message ValidateSessionRequest {} // Token handled by Interceptor/Metadata
+
+message ValidateSessionResponse {
+    string user_id = 1;
+    bool valid = 2;
+}
+
+message RefreshSessionRequest {}
+
+message RefreshSessionResponse {
+    string new_session_token = 1;
+}

@@ -1,0 +1,15 @@
+.env
+.env.local
+*.log
+bin/
+dist/
+vendor/
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+coverage.out
+coverage.html
+data
