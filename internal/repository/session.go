@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -44,7 +43,7 @@ func (r *SessionRepository) GetByTokenHash(ctx context.Context, tokenHash string
 }
 
 // GetByUserID retrieves all valid sessions for a user
-func (r *SessionRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Session, error) {
+func (r *SessionRepository) GetByUserID(ctx context.Context, userID int64) ([]domain.Session, error) {
 	var sessions []domain.Session
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND expires_at > ?", userID, time.Now()).
@@ -63,14 +62,14 @@ func (r *SessionRepository) Update(ctx context.Context, session *domain.Session)
 }
 
 // Delete removes a session (hard delete)
-func (r *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) error {
+func (r *SessionRepository) Delete(ctx context.Context, sessionID int64) error {
 	return r.db.WithContext(ctx).
 		Where("id = ?", sessionID).
 		Delete(&domain.Session{}).Error
 }
 
 // SoftDelete soft-deletes a session by setting deleted_at
-func (r *SessionRepository) SoftDelete(ctx context.Context, sessionID uuid.UUID) error {
+func (r *SessionRepository) SoftDelete(ctx context.Context, sessionID int64) error {
 	return r.db.WithContext(ctx).
 		Model(&domain.Session{}).
 		Where("id = ?", sessionID).
@@ -78,7 +77,7 @@ func (r *SessionRepository) SoftDelete(ctx context.Context, sessionID uuid.UUID)
 }
 
 // SoftDeleteByUserID soft-deletes all sessions for a user
-func (r *SessionRepository) SoftDeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+func (r *SessionRepository) SoftDeleteByUserID(ctx context.Context, userID int64) error {
 	return r.db.WithContext(ctx).
 		Model(&domain.Session{}).
 		Where("user_id = ?", userID).
@@ -93,7 +92,7 @@ func (r *SessionRepository) DeleteExpiredAndSoftDeleted(ctx context.Context) err
 }
 
 // IsTokenValid checks if a token is valid (exists, not expired, and not soft-deleted)
-func (r *SessionRepository) IsTokenValid(ctx context.Context, tokenHash string) (bool, uuid.UUID, error) {
+func (r *SessionRepository) IsTokenValid(ctx context.Context, tokenHash string) (bool, int64, error) {
 	var session domain.Session
 	err := r.db.WithContext(ctx).
 		Where("token_hash = ? AND expires_at > ? AND deleted_at IS NULL", tokenHash, time.Now()).
@@ -101,9 +100,9 @@ func (r *SessionRepository) IsTokenValid(ctx context.Context, tokenHash string) 
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, uuid.UUID{}, nil
+			return false, 0, nil
 		}
-		return false, uuid.UUID{}, &domain.InternalError{Message: "failed to validate token", Err: err}
+		return false, 0, &domain.InternalError{Message: "failed to validate token", Err: err}
 	}
 
 	return true, session.UserID, nil

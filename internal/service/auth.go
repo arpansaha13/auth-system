@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
 	"github.com/arpansaha13/auth-system/internal/utils"
@@ -65,7 +63,7 @@ type SignupRequest struct {
 // SignupResponse represents signup output with confirmation message and user ID
 type SignupResponse struct {
 	Message string // Confirmation message ("signup successful, check your email for otp")
-	UserID  string // UUID of the newly created user
+	UserID  int64  // Bigint ID of the newly created user
 }
 
 // Signup registers a new user with email and password.
@@ -142,13 +140,13 @@ func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupRes
 
 	return &SignupResponse{
 		Message: "signup successful, check your email for otp",
-		UserID:  newUser.ID.String(),
+		UserID:  newUser.ID,
 	}, nil
 }
 
 // VerifyOTPRequest represents OTP verification input with user ID and OTP code
 type VerifyOTPRequest struct {
-	UserID string // UUID of the user who received the OTP
+	UserID int64  // Bigint ID of the user who received the OTP
 	Code   string // 6-digit OTP code from email
 }
 
@@ -170,11 +168,8 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 		return nil, &domain.ValidationError{Message: "invalid otp format", Field: "code"}
 	}
 
-	// Parse user ID
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		return nil, &domain.ValidationError{Message: "invalid user id format", Field: "user_id"}
-	}
+	// UserID is already validated as int64
+	userID := req.UserID
 
 	// Get user
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -320,7 +315,7 @@ type ValidateSessionRequest struct {
 
 // ValidateSessionResponse represents session validation output
 type ValidateSessionResponse struct {
-	UserID string
+	UserID int64
 	Valid  bool
 }
 
@@ -337,7 +332,7 @@ func (s *AuthService) ValidateSession(ctx context.Context, req ValidateSessionRe
 	}
 
 	return &ValidateSessionResponse{
-		UserID: userID.String(),
+		UserID: userID,
 		Valid:  valid,
 	}, nil
 }

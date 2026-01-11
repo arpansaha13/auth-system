@@ -3,16 +3,15 @@ package domain
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // User represents the users table
 type User struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Email     string    `gorm:"type:varchar(255);uniqueIndex;not null"`
-	Username  *string   `gorm:"type:varchar(100);uniqueIndex"`
-	Verified  bool      `gorm:"default:false;not null"`
+	ID        int64   `gorm:"primaryKey;autoIncrement"`
+	Email     string  `gorm:"type:varchar(255);uniqueIndex;not null"`
+	Username  *string `gorm:"type:varchar(100);uniqueIndex"`
+	Verified  bool    `gorm:"default:false;not null"`
 	LastLogin *time.Time
 	CreatedAt time.Time
 
@@ -30,9 +29,9 @@ func (User) TableName() string {
 
 // Profile represents the profiles table (one-to-one)
 type Profile struct {
-	UserID    uuid.UUID `gorm:"type:uuid;primaryKey;references:ID"`
-	FirstName *string   `gorm:"type:varchar(100)"`
-	LastName  *string   `gorm:"type:varchar(100)"`
+	UserID    int64   `gorm:"primaryKey;references:ID"`
+	FirstName *string `gorm:"type:varchar(100)"`
+	LastName  *string `gorm:"type:varchar(100)"`
 
 	// Relation
 	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
@@ -45,8 +44,8 @@ func (Profile) TableName() string {
 
 // Credentials represents the credentials table (one-to-one)
 type Credentials struct {
-	UserID       uuid.UUID `gorm:"type:uuid;primaryKey;references:ID"`
-	PasswordHash string    `gorm:"type:varchar(255);not null"`
+	UserID       int64  `gorm:"primaryKey;references:ID"`
+	PasswordHash string `gorm:"type:varchar(255);not null"`
 
 	// Relation
 	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
@@ -59,7 +58,7 @@ func (Credentials) TableName() string {
 
 // OTP represents the otps table (one-to-one)
 type OTP struct {
-	UserID     uuid.UUID  `gorm:"type:uuid;primaryKey;references:ID"`
+	UserID     int64      `gorm:"primaryKey;references:ID"`
 	HashedCode string     `gorm:"type:varchar(255);not null"`
 	ExpiresAt  time.Time  `gorm:"not null"`
 	DeletedAt  *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete
@@ -75,8 +74,8 @@ func (OTP) TableName() string {
 
 // Session represents the sessions table
 type Session struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
+	ID        int64      `gorm:"primaryKey;autoIncrement"`
+	UserID    int64      `gorm:"not null;index"`
 	TokenHash string     `gorm:"type:varchar(255);uniqueIndex;not null"`
 	ExpiresAt time.Time  `gorm:"not null"`
 	DeletedAt *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete

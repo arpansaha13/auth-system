@@ -34,6 +34,22 @@ service AuthService {
     // Token is extracted from request metadata (Authorization header).
     // After logout, token becomes invalid.
     rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+    // GetUser retrieves user profile information by user_id.
+    // Used by other microservices to fetch user details.
+    rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+    // UpdateUserProfile updates user profile information (first_name, last_name).
+    // Returns updated user profile.
+    rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
+
+    // GetUserByEmail retrieves user details by email address.
+    // Used internally for user lookup during login and verification.
+    rpc GetUserByEmail(GetUserByEmailRequest) returns (GetUserByEmailResponse);
+
+    // DeleteUser deletes a user and all associated data (soft delete for sessions/OTPs).
+    // Returns confirmation message.
+    rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
 }
 
 // SignupRequest contains email and password for user registration.
@@ -45,12 +61,12 @@ message SignupRequest {
 // SignupResponse returns confirmation message and newly created user_id.
 message SignupResponse {
     string message = 1; // Confirmation message
-    string user_id = 2; // UUID of the newly created user
+    int64 user_id = 2; // Bigint ID of the newly created user
 }
 
 // VerifyOTPRequest contains user_id and OTP code for email verification.
 message VerifyOTPRequest {
-    string user_id = 1; // UUID of the user
+    int64 user_id = 1; // Bigint ID of the user
     string code = 2; // 6-digit OTP code sent to email
 }
 
@@ -79,7 +95,7 @@ message ValidateSessionRequest {}
 
 // ValidateSessionResponse returns user_id and token validity status.
 message ValidateSessionResponse {
-    string user_id = 1; // UUID of the authenticated user
+    int64 user_id = 1; // Bigint ID of the authenticated user
     bool valid = 2; // True if token is valid and not expired
 }
 
@@ -99,4 +115,57 @@ message LogoutRequest {}
 // LogoutResponse returns confirmation of logout.
 message LogoutResponse {
     string message = 1; // Confirmation message ("logout successful")
+}
+
+// GetUserRequest contains user_id for profile retrieval.
+message GetUserRequest {
+    int64 user_id = 1; // Bigint ID of the user
+}
+
+// UserProfile contains user information.
+message UserProfile {
+    int64 user_id = 1; // Bigint ID of the user
+    string email = 2; // User's email address
+    string username = 3; // User's username (auto-generated on verification)
+    bool verified = 4; // Whether user has verified email
+    string first_name = 5; // User's first name (optional)
+    string last_name = 6; // User's last name (optional)
+    google.protobuf.Timestamp created_at = 7; // User creation timestamp (UTC)
+}
+
+// GetUserResponse returns user profile information.
+message GetUserResponse {
+    UserProfile user = 1; // Complete user profile
+}
+
+// UpdateUserProfileRequest contains profile update information.
+message UpdateUserProfileRequest {
+    int64 user_id = 1; // Bigint ID of the user to update
+    string first_name = 2; // New first name (optional, leave empty to skip)
+    string last_name = 3; // New last name (optional, leave empty to skip)
+}
+
+// UpdateUserProfileResponse returns updated user profile.
+message UpdateUserProfileResponse {
+    UserProfile user = 1; // Updated user profile
+}
+
+// GetUserByEmailRequest contains email for user lookup.
+message GetUserByEmailRequest {
+    string email = 1; // Email address to search for
+}
+
+// GetUserByEmailResponse returns user information for given email.
+message GetUserByEmailResponse {
+    UserProfile user = 1; // User profile with given email
+}
+
+// DeleteUserRequest contains user_id for deletion.
+message DeleteUserRequest {
+    int64 user_id = 1; // Bigint ID of the user to delete
+}
+
+// DeleteUserResponse returns confirmation of user deletion.
+message DeleteUserResponse {
+    string message = 1; // Confirmation message ("user deleted successfully")
 }

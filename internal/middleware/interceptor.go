@@ -13,7 +13,7 @@ import (
 
 // AuthorizationInterceptor intercepts gRPC requests to validate session tokens
 func AuthorizationInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Skip authorization for public endpoints
 		if isPublicEndpoint(info.FullMethod) {
 			return handler(ctx, req)
@@ -35,7 +35,7 @@ func AuthorizationInterceptor() grpc.UnaryServerInterceptor {
 
 // RecoveryInterceptor recovers from panics in gRPC handlers
 func RecoveryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("panic recovered in %s: %v", info.FullMethod, r)
@@ -49,7 +49,7 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 
 // LoggingInterceptor logs gRPC method calls
 func LoggingInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		log.Printf("gRPC method called: %s", info.FullMethod)
 
 		resp, err := handler(ctx, req)
@@ -77,8 +77,8 @@ func extractTokenFromMetadata(ctx context.Context) string {
 
 	// Extract bearer token
 	authHeader := values[0]
-	if strings.HasPrefix(authHeader, "Bearer ") {
-		return strings.TrimPrefix(authHeader, "Bearer ")
+	if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+		return after
 	}
 
 	return authHeader
@@ -86,8 +86,8 @@ func extractTokenFromMetadata(ctx context.Context) string {
 
 func isPublicEndpoint(fullMethod string) bool {
 	publicEndpoints := map[string]bool{
-		"/auth.AuthService/Signup":   true,
-		"/auth.AuthService/Login":    true,
+		"/auth.AuthService/Signup":    true,
+		"/auth.AuthService/Login":     true,
 		"/auth.AuthService/VerifyOTP": true,
 	}
 
@@ -96,12 +96,12 @@ func isPublicEndpoint(fullMethod string) bool {
 
 // ChainUnaryInterceptors chains multiple unary interceptors
 func ChainUnaryInterceptors(interceptors ...grpc.UnaryServerInterceptor) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Build chain from right to left
 		for i := len(interceptors) - 1; i >= 0; i-- {
 			next := handler
 			currentInterceptor := interceptors[i]
-			handler = func(ctx context.Context, req interface{}) (interface{}, error) {
+			handler = func(ctx context.Context, req any) (any, error) {
 				return currentInterceptor(ctx, req, info, next)
 			}
 		}

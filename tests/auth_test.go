@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
 	"github.com/arpansaha13/auth-system/internal/service"
 	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/internal/worker"
-	"github.com/google/uuid"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 // TestDB holds database resources for tests
@@ -142,7 +142,7 @@ func TestSignupFlow(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	if signupResp.UserID == "" {
+	if signupResp.UserID == 0 {
 		t.Fatal("Expected user ID in response")
 	}
 
@@ -242,7 +242,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	userID := uuid.MustParse(signupResp.UserID)
+	userID := signupResp.UserID
 
 	// Step 2: Get OTP from database (simulate email)
 	otp, err := otpRepo.GetByUserID(ctx, userID)
@@ -273,7 +273,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 
 	// Step 3: Verify OTP
 	verifyResp, err := authService.VerifyOTP(ctx, service.VerifyOTPRequest{
-		UserID: userID.String(),
+		UserID: userID,
 		Code:   testOTP,
 	})
 
@@ -316,8 +316,8 @@ func TestCompleteAuthFlow(t *testing.T) {
 		t.Fatal("Expected session to be valid")
 	}
 
-	if validateResp.UserID != userID.String() {
-		t.Fatalf("Expected user ID %s, got %s", userID.String(), validateResp.UserID)
+	if validateResp.UserID != userID {
+		t.Fatalf("Expected user ID %d, got %d", userID, validateResp.UserID)
 	}
 
 	t.Log("Complete auth flow successful")
@@ -331,46 +331,45 @@ func TestSessionRefresh(t *testing.T) {
 
 	authService := testdb.CreateAuthService()
 
-	// Create a user manually for testing
-	user := &domain.User{
-		Email:    "test@example.com",
-		Verified: true,
-	}
-	if err := testdb.DB.Create(user).Error; err != nil {
-		t.Fatalf("Failed to create user: %v", err)
-	}
-
-	// Create a session
-	oldToken := "test-token-12345678901234567890"
-	_ = oldToken // oldToken used for reference
-
-	_, _ = authService.Login(ctx, service.LoginRequest{
-		Email:    "test@example.com",
-		Password: "somePassword",
+	// Complete signup, verify OTP, and login flow to get a valid session
+	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+		Email:    "refresh-test@example.com",
+		Password: "password123",
 	})
-
-	// This will fail because credentials don't exist
-	// Let's create credentials first
-	creds := &domain.Credentials{
-		UserID:       user.ID,
-		PasswordHash: "ignored",
-	}
-	if createErr := testdb.DB.Create(creds).Error; createErr != nil {
-		t.Fatalf("Failed to create credentials: %v", createErr)
+	if err != nil {
+		t.Fatalf("Signup failed: %v", err)
 	}
 
-	// Try again - this will still fail because password won't match
-	// For this test, let's just verify the refresh logic with an existing session
-	session := &domain.Session{
-		UserID:    user.ID,
-		TokenHash: oldToken,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
-	}
-	if err := testdb.DB.Create(session).Error; err != nil {
-		t.Fatalf("Failed to create session: %v", err)
+	userID := signupResp.UserID
+
+	// Prepare and verify OTP
+	otpRecord := &domain.OTP{}
+	testdb.DB.Where("user_id = ?", userID).First(otpRecord)
+	testOTP := "123456"
+	hasher := utils.NewPasswordHasher()
+	otpHash, _ := hasher.Hash(testOTP)
+	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
+
+	_, err = authService.VerifyOTP(ctx, service.VerifyOTPRequest{
+		UserID: userID,
+		Code:   testOTP,
+	})
+	if err != nil {
+		t.Fatalf("OTP verification failed: %v", err)
 	}
 
-	// Test refresh
+	// Login to get a valid session token
+	loginResp, err := authService.Login(ctx, service.LoginRequest{
+		Email:    "refresh-test@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	oldToken := loginResp.SessionToken
+
+	// Test refresh with valid token
 	refreshResp, err := authService.RefreshSession(ctx, service.RefreshSessionRequest{
 		Token: oldToken,
 	})
@@ -388,4 +387,140 @@ func TestSessionRefresh(t *testing.T) {
 	}
 
 	t.Log("Session refresh successful")
+}
+
+// TestLogout tests the logout functionality
+func TestLogout(t *testing.T) {
+	ctx := context.Background()
+	testdb := SetupTestDB(ctx, t)
+	defer testdb.Cleanup(t)
+
+	authService := testdb.CreateAuthService()
+
+	// Step 1: Signup
+	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+		Email:    "logout-test@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("Signup failed: %v", err)
+	}
+
+	userID := signupResp.UserID
+
+	// Step 2: Get OTP from database
+	otpRecord := &domain.OTP{}
+	if err := testdb.DB.Where("user_id = ?", userID).First(otpRecord).Error; err != nil {
+		t.Fatalf("Failed to get OTP: %v", err)
+	}
+
+	// Generate test OTP that will match the hash
+	testOTP := "123456"
+	hasher := utils.NewPasswordHasher()
+	otpHash, _ := hasher.Hash(testOTP)
+	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
+
+	// Step 3: Verify OTP
+	_, err = authService.VerifyOTP(ctx, service.VerifyOTPRequest{
+		UserID: userID,
+		Code:   testOTP,
+	})
+	if err != nil {
+		t.Fatalf("OTP verification failed: %v", err)
+	}
+
+	// Step 4: Login
+	loginResp, err := authService.Login(ctx, service.LoginRequest{
+		Email:    "logout-test@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	// Step 5: Verify session is valid before logout
+	validateResp, err := authService.ValidateSession(ctx, service.ValidateSessionRequest{
+		Token: loginResp.SessionToken,
+	})
+	if err != nil {
+		t.Fatalf("Session validation failed: %v", err)
+	}
+
+	if !validateResp.Valid {
+		t.Fatal("Expected session to be valid before logout")
+	}
+
+	// Step 6: Logout
+	logoutResp, err := authService.Logout(ctx, service.LogoutRequest{
+		Token: loginResp.SessionToken,
+	})
+	if err != nil {
+		t.Fatalf("Logout failed: %v", err)
+	}
+
+	if logoutResp.Message != "logout successful" {
+		t.Fatalf("Expected logout success message, got: %s", logoutResp.Message)
+	}
+
+	// Step 7: Verify session is invalid after logout
+	validateAfterLogout, err := authService.ValidateSession(ctx, service.ValidateSessionRequest{
+		Token: loginResp.SessionToken,
+	})
+	if err != nil {
+		t.Fatalf("Session validation after logout failed: %v", err)
+	}
+
+	if validateAfterLogout.Valid {
+		t.Fatal("Expected session to be invalid after logout")
+	}
+
+	t.Log("Logout successful and session invalidated")
+}
+
+// TestLogoutInvalidToken tests logout with an invalid token
+func TestLogoutInvalidToken(t *testing.T) {
+	ctx := context.Background()
+	testdb := SetupTestDB(ctx, t)
+	defer testdb.Cleanup(t)
+
+	authService := testdb.CreateAuthService()
+
+	// Try to logout with invalid token
+	_, err := authService.Logout(ctx, service.LogoutRequest{
+		Token: "invalid-token",
+	})
+
+	if err == nil {
+		t.Fatal("Expected error for invalid token")
+	}
+
+	if !domain.IsNotFound(err) {
+		t.Fatalf("Expected NotFoundError, got: %T", err)
+	}
+
+	t.Log("Invalid token logout properly rejected")
+}
+
+// TestLogoutEmptyToken tests logout with empty token
+func TestLogoutEmptyToken(t *testing.T) {
+	ctx := context.Background()
+	testdb := SetupTestDB(ctx, t)
+	defer testdb.Cleanup(t)
+
+	authService := testdb.CreateAuthService()
+
+	// Try to logout with empty token
+	_, err := authService.Logout(ctx, service.LogoutRequest{
+		Token: "",
+	})
+
+	if err == nil {
+		t.Fatal("Expected error for empty token")
+	}
+
+	if !domain.IsUnauthorized(err) {
+		t.Fatalf("Expected UnauthorizedError, got: %T", err)
+	}
+
+	t.Log("Empty token logout properly rejected")
 }

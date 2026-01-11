@@ -38,7 +38,7 @@ type VerifyOTPPayload struct {
 }
 
 // Validate validates a struct
-func (v *Validator) Validate(data interface{}) error {
+func (v *Validator) Validate(data any) error {
 	return v.validate.Struct(data)
 }
 

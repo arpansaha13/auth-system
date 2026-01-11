@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -27,7 +26,7 @@ func (r *OTPRepository) Create(ctx context.Context, otp *domain.OTP) error {
 }
 
 // GetByUserID retrieves OTP by user ID (excludes soft-deleted)
-func (r *OTPRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.OTP, error) {
+func (r *OTPRepository) GetByUserID(ctx context.Context, userID int64) (*domain.OTP, error) {
 	var otp domain.OTP
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND deleted_at IS NULL", userID).
@@ -44,7 +43,7 @@ func (r *OTPRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*dom
 }
 
 // SoftDelete soft-deletes an OTP record
-func (r *OTPRepository) SoftDelete(ctx context.Context, userID uuid.UUID) error {
+func (r *OTPRepository) SoftDelete(ctx context.Context, userID int64) error {
 	return r.db.WithContext(ctx).
 		Model(&domain.OTP{}).
 		Where("user_id = ?", userID).

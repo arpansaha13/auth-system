@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"github.com/google/uuid"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 )
@@ -66,7 +65,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 }
 
 // GetByID retrieves a user by ID
-func (r *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+func (r *UserRepository) GetByID(ctx context.Context, userID int64) (*domain.User, error) {
 	var user domain.User
 	err := r.db.WithContext(ctx).
 		Preload("Credentials").
@@ -106,18 +105,18 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*d
 }
 
 // UpdateVerified marks a user as verified and sets their username
-func (r *UserRepository) UpdateVerified(ctx context.Context, userID uuid.UUID, username string) error {
+func (r *UserRepository) UpdateVerified(ctx context.Context, userID int64, username string) error {
 	return r.db.WithContext(ctx).
 		Model(&domain.User{}).
 		Where("id = ?", userID).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"verified": true,
 			"username": username,
 		}).Error
 }
 
 // UpdateLastLogin updates the user's last login timestamp
-func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID uuid.UUID) error {
+func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID int64) error {
 	now := time.Now()
 	return r.db.WithContext(ctx).
 		Model(&domain.User{}).
