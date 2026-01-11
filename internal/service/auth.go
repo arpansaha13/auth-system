@@ -15,7 +15,9 @@ import (
 	"github.com/arpansaha13/auth-system/internal/worker"
 )
 
-// AuthService handles authentication business logic
+// AuthService handles authentication and session management business logic.
+// It provides methods for user registration, email verification, login, session validation, refresh, and logout.
+// All methods are context-aware and handle errors with domain-specific error types.
 type AuthService struct {
 	userRepo    *repository.UserRepository
 	otpRepo     *repository.OTPRepository
@@ -34,7 +36,8 @@ type AuthServiceConfig struct {
 	EmailPool  *worker.EmailWorkerPool
 }
 
-// NewAuthService creates a new auth service
+// NewAuthService creates a new auth service with all dependencies initialized.
+// Returns a fully configured AuthService ready for use.
 func NewAuthService(
 	userRepo *repository.UserRepository,
 	otpRepo *repository.OTPRepository,
@@ -53,19 +56,22 @@ func NewAuthService(
 	}
 }
 
-// SignupRequest represents signup input
+// SignupRequest represents signup input with email and password
 type SignupRequest struct {
-	Email    string
-	Password string
+	Email    string // User's email address
+	Password string // User's password (minimum 8 characters)
 }
 
-// SignupResponse represents signup output
+// SignupResponse represents signup output with confirmation message and user ID
 type SignupResponse struct {
-	Message string
-	UserID  string
+	Message string // Confirmation message ("signup successful, check your email for otp")
+	UserID  string // UUID of the newly created user
 }
 
-// Signup handles user registration with OTP email dispatch
+// Signup registers a new user with email and password.
+// Validates email uniqueness, hashes password, creates user record, generates 6-digit OTP,
+// and enqueues email task for async delivery. OTP expires in 10 minutes.
+// Returns error if email already exists, validation fails, or database operations fail.
 func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupResponse, error) {
 	// Validate input
 	if err := s.validator.ValidateEmail(req.Email); err != nil {
@@ -140,20 +146,24 @@ func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupRes
 	}, nil
 }
 
-// VerifyOTPRequest represents OTP verification input
+// VerifyOTPRequest represents OTP verification input with user ID and OTP code
 type VerifyOTPRequest struct {
-	UserID string
-	Code   string
+	UserID string // UUID of the user who received the OTP
+	Code   string // 6-digit OTP code from email
 }
 
-// VerifyOTPResponse represents OTP verification output
+// VerifyOTPResponse represents OTP verification output with username and initial session
 type VerifyOTPResponse struct {
-	Message      string
-	Username     string
-	SessionToken string
+	Message      string // Confirmation message
+	Username     string // Auto-generated username (email_prefix + 6 random digits)
+	SessionToken string // Initial session token for immediate authentication
 }
 
-// VerifyOTP verifies OTP and marks user as verified
+// VerifyOTP verifies the OTP code sent to user's email and marks user as verified.
+// Generates a unique username (with collision retry up to 10 times), marks user as verified,
+// soft-deletes the OTP, and creates an initial session token. User can then use this session
+// or login with email/password.
+// Returns error if OTP is invalid, expired, already verified, or validation fails.
 func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyOTPResponse, error) {
 	// Validate input
 	if err := s.validator.ValidateOTPCode(req.Code, s.config.OTPLength); err != nil {
@@ -206,7 +216,7 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 	}
 
 	// Delete OTP
-	if err := s.otpRepo.Delete(ctx, userID); err != nil {
+	if err := s.otpRepo.SoftDelete(ctx, userID); err != nil {
 		return nil, &domain.InternalError{Message: "failed to clean up otp", Err: err}
 	}
 
@@ -234,19 +244,22 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 	}, nil
 }
 
-// LoginRequest represents login input
+// LoginRequest represents login input with email and password
 type LoginRequest struct {
-	Email    string
-	Password string
+	Email    string // User's email address
+	Password string // User's password
 }
 
-// LoginResponse represents login output
+// LoginResponse represents login output with session token and expiry
 type LoginResponse struct {
-	SessionToken string
-	ExpiresAt    time.Time
+	SessionToken string    // Valid session token (32-byte hex)
+	ExpiresAt    time.Time // Token expiration time (UTC)
 }
 
-// Login authenticates user with email and password
+// Login authenticates a user with email and password credentials.
+// Validates email and password, checks if user is verified, creates a new session token,
+// and updates the user's last_login timestamp.
+// Returns error if user not found, password incorrect, email not verified, or database operations fail.
 func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	// Validate input
 	if err := s.validator.ValidateEmail(req.Email); err != nil {
@@ -339,7 +352,9 @@ type RefreshSessionResponse struct {
 	NewSessionToken string
 }
 
-// RefreshSession extends a valid session token
+// RefreshSession extends a valid session token by creating a new session token and updating the expiry.
+// Invalidates the old token hash and returns a new one with extended TTL.
+// Returns error if token is invalid, expired, or if database update fails.
 func (s *AuthService) RefreshSession(ctx context.Context, req RefreshSessionRequest) (*RefreshSessionResponse, error) {
 	if req.Token == "" {
 		return nil, &domain.UnauthorizedError{Message: "invalid token"}
@@ -372,6 +387,48 @@ func (s *AuthService) RefreshSession(ctx context.Context, req RefreshSessionRequ
 
 	return &RefreshSessionResponse{
 		NewSessionToken: newToken,
+	}, nil
+}
+
+// LogoutRequest represents logout input (empty, token from context)
+type LogoutRequest struct {
+	Token string
+}
+
+// LogoutResponse represents logout output
+type LogoutResponse struct {
+	Message string
+}
+
+// Logout soft-deletes the user's current session, making the token invalid for future use.
+// The session record is kept in the database with deleted_at timestamp for audit purposes.
+// Physically deleted sessions are cleaned up by the cleanup worker.
+// Returns error if token is invalid or if soft delete operation fails.
+func (s *AuthService) Logout(ctx context.Context, req LogoutRequest) (*LogoutResponse, error) {
+	if req.Token == "" {
+		return nil, &domain.UnauthorizedError{Message: "invalid token"}
+	}
+
+	tokenHash := s.hashToken(req.Token)
+
+	// Get session to find its ID
+	session, err := s.sessionRepo.GetByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if session is still valid
+	if time.Now().After(session.ExpiresAt) {
+		return nil, &domain.UnauthorizedError{Message: "session expired"}
+	}
+
+	// Soft delete the session
+	if err := s.sessionRepo.SoftDelete(ctx, session.ID); err != nil {
+		return nil, &domain.InternalError{Message: "failed to logout", Err: err}
+	}
+
+	return &LogoutResponse{
+		Message: "logout successful",
 	}, nil
 }
 

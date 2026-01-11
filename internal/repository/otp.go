@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/arpansaha13/auth-system/internal/domain"
 	"gorm.io/gorm"
+
+	"github.com/arpansaha13/auth-system/internal/domain"
 )
 
 // OTPRepository handles OTP-related database operations
@@ -25,11 +26,11 @@ func (r *OTPRepository) Create(ctx context.Context, otp *domain.OTP) error {
 	return r.db.WithContext(ctx).Create(otp).Error
 }
 
-// GetByUserID retrieves OTP by user ID
+// GetByUserID retrieves OTP by user ID (excludes soft-deleted)
 func (r *OTPRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.OTP, error) {
 	var otp domain.OTP
 	err := r.db.WithContext(ctx).
-		Where("user_id = ?", userID).
+		Where("user_id = ? AND deleted_at IS NULL", userID).
 		First(&otp).Error
 
 	if err != nil {
@@ -42,16 +43,17 @@ func (r *OTPRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*dom
 	return &otp, nil
 }
 
-// Delete removes an OTP record
-func (r *OTPRepository) Delete(ctx context.Context, userID uuid.UUID) error {
+// SoftDelete soft-deletes an OTP record
+func (r *OTPRepository) SoftDelete(ctx context.Context, userID uuid.UUID) error {
 	return r.db.WithContext(ctx).
+		Model(&domain.OTP{}).
 		Where("user_id = ?", userID).
-		Delete(&domain.OTP{}).Error
+		Update("deleted_at", time.Now()).Error
 }
 
-// DeleteExpired removes all expired OTP records
-func (r *OTPRepository) DeleteExpired(ctx context.Context) error {
+// DeleteExpiredAndSoftDeleted physically deletes expired and soft-deleted OTPs
+func (r *OTPRepository) DeleteExpiredAndSoftDeleted(ctx context.Context) error {
 	return r.db.WithContext(ctx).
-		Where("expires_at < ?", time.Now()).
+		Where("expires_at < ? OR deleted_at IS NOT NULL", time.Now()).
 		Delete(&domain.OTP{}).Error
 }

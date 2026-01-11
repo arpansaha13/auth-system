@@ -61,14 +61,14 @@ func (w *CleanupWorker) cleanup() {
 	defer cancel()
 
 	// Clean up expired sessions
-	if err := w.sessionRepo.DeleteExpired(ctx); err != nil {
+	if err := w.sessionRepo.DeleteExpiredAndSoftDeleted(ctx); err != nil {
 		log.Printf("failed to delete expired sessions: %v", err)
 	} else {
 		log.Println("expired sessions cleaned up")
 	}
 
 	// Clean up expired OTPs
-	if err := w.otpRepo.DeleteExpired(ctx); err != nil {
+	if err := w.otpRepo.DeleteExpiredAndSoftDeleted(ctx); err != nil {
 		log.Printf("failed to delete expired otps: %v", err)
 	} else {
 		log.Println("expired otps cleaned up")

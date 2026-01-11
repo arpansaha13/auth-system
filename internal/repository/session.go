@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/arpansaha13/auth-system/internal/domain"
 	"gorm.io/gorm"
+
+	"github.com/arpansaha13/auth-system/internal/domain"
 )
 
 // SessionRepository handles session-related database operations
@@ -61,32 +62,41 @@ func (r *SessionRepository) Update(ctx context.Context, session *domain.Session)
 	return r.db.WithContext(ctx).Save(session).Error
 }
 
-// Delete removes a session
+// Delete removes a session (hard delete)
 func (r *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) error {
 	return r.db.WithContext(ctx).
 		Where("id = ?", sessionID).
 		Delete(&domain.Session{}).Error
 }
 
-// DeleteExpired removes all expired sessions
-func (r *SessionRepository) DeleteExpired(ctx context.Context) error {
+// SoftDelete soft-deletes a session by setting deleted_at
+func (r *SessionRepository) SoftDelete(ctx context.Context, sessionID uuid.UUID) error {
 	return r.db.WithContext(ctx).
-		Where("expires_at < ?", time.Now()).
-		Delete(&domain.Session{}).Error
+		Model(&domain.Session{}).
+		Where("id = ?", sessionID).
+		Update("deleted_at", time.Now()).Error
 }
 
-// DeleteByUserID removes all sessions for a user
-func (r *SessionRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+// SoftDeleteByUserID soft-deletes all sessions for a user
+func (r *SessionRepository) SoftDeleteByUserID(ctx context.Context, userID uuid.UUID) error {
 	return r.db.WithContext(ctx).
+		Model(&domain.Session{}).
 		Where("user_id = ?", userID).
+		Update("deleted_at", time.Now()).Error
+}
+
+// DeleteExpiredAndSoftDeleted physically deletes expired and soft-deleted sessions
+func (r *SessionRepository) DeleteExpiredAndSoftDeleted(ctx context.Context) error {
+	return r.db.WithContext(ctx).
+		Where("expires_at < ? OR deleted_at IS NOT NULL", time.Now()).
 		Delete(&domain.Session{}).Error
 }
 
-// IsTokenValid checks if a token is valid (exists and not expired)
+// IsTokenValid checks if a token is valid (exists, not expired, and not soft-deleted)
 func (r *SessionRepository) IsTokenValid(ctx context.Context, tokenHash string) (bool, uuid.UUID, error) {
 	var session domain.Session
 	err := r.db.WithContext(ctx).
-		Where("token_hash = ? AND expires_at > ?", tokenHash, time.Now()).
+		Where("token_hash = ? AND expires_at > ? AND deleted_at IS NULL", tokenHash, time.Now()).
 		First(&session).Error
 
 	if err != nil {

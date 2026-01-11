@@ -154,6 +154,30 @@ func (s *AuthServiceImpl) RefreshSession(ctx context.Context, req *pb.RefreshSes
 	}, nil
 }
 
+// Logout logs out a session
+func (s *AuthServiceImpl) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	// Extract token from metadata
+	token := extractToken(ctx)
+	if token == "" {
+		return nil, status.Error(codes.Unauthenticated, "missing authorization token")
+	}
+
+	// Call service
+	serviceReq := service.LogoutRequest{
+		Token: token,
+	}
+
+	resp, err := s.authService.Logout(ctx, serviceReq)
+	if err != nil {
+		log.Printf("logout error: %v", err)
+		return nil, errorToGRPCError(err)
+	}
+
+	return &pb.LogoutResponse{
+		Message: resp.Message,
+	}, nil
+}
+
 // Private helper functions
 
 func validateSignupRequest(req *pb.SignupRequest) error {
@@ -167,7 +191,7 @@ func validateSignupRequest(req *pb.SignupRequest) error {
 }
 
 func validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
-	if req.UserId == "" {
+	if req.UserId == 0 {
 		return &domain.ValidationError{Message: "user_id is required", Field: "user_id"}
 	}
 	if req.Code == "" {

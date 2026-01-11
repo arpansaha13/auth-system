@@ -59,9 +59,10 @@ func (Credentials) TableName() string {
 
 // OTP represents the otps table (one-to-one)
 type OTP struct {
-	UserID    uuid.UUID `gorm:"type:uuid;primaryKey;references:ID"`
-	HashedCode string    `gorm:"type:varchar(255);not null"`
-	ExpiresAt time.Time `gorm:"not null"`
+	UserID     uuid.UUID  `gorm:"type:uuid;primaryKey;references:ID"`
+	HashedCode string     `gorm:"type:varchar(255);not null"`
+	ExpiresAt  time.Time  `gorm:"not null"`
+	DeletedAt  *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete
 
 	// Relation
 	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
@@ -74,11 +75,12 @@ func (OTP) TableName() string {
 
 // Session represents the sessions table
 type Session struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
-	TokenHash string    `gorm:"type:varchar(255);uniqueIndex;not null"`
-	ExpiresAt time.Time `gorm:"not null"`
-	CreatedAt time.Time
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
+	TokenHash string     `gorm:"type:varchar(255);uniqueIndex;not null"`
+	ExpiresAt time.Time  `gorm:"not null"`
+	DeletedAt *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete
+	CreatedAt time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP"`
 
 	// Relation
 	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
