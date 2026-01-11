@@ -2,97 +2,31 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
-
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
 	"github.com/arpansaha13/auth-system/internal/service"
 	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/internal/worker"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/gorm"
 )
 
-// TestDB holds database resources for tests
+// TestDB holds database resources for tests (deprecated, use shared global)
 type TestDB struct {
-	DB        *gorm.DB
-	Container testcontainers.Container
-	Ctx       context.Context
+	DB  *gorm.DB
+	Ctx context.Context
 }
 
-// SetupTestDB creates a test database using Testcontainers
-func SetupTestDB(ctx context.Context, t *testing.T) *TestDB {
-	// Request a PostgreSQL container
-	req := testcontainers.ContainerRequest{
-		Image:        "postgres:16-alpine",
-		ExposedPorts: []string{"5432/tcp"},
-		Env: map[string]string{
-			"POSTGRES_USER":     "testuser",
-			"POSTGRES_PASSWORD": "testpass",
-			"POSTGRES_DB":       "test_auth",
-		},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").
-			WithOccurrence(2).
-			WithStartupTimeout(60 * time.Second),
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to start container: %v", err)
-	}
-
-	// Get the container's host and port
-	host, err := container.Host(ctx)
-	if err != nil {
-		container.Terminate(ctx)
-		t.Fatalf("Failed to get host: %v", err)
-	}
-
-	port, err := container.MappedPort(ctx, "5432")
-	if err != nil {
-		container.Terminate(ctx)
-		t.Fatalf("Failed to get port: %v", err)
-	}
-
-	// Connect to the database
-	dsn := fmt.Sprintf(
-		"host=%s port=%s user=testuser password=testpass dbname=test_auth sslmode=disable",
-		host, port.Port(),
-	)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		container.Terminate(ctx)
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-
-	// Run migrations
-	if err := domain.AutoMigrate(db); err != nil {
-		container.Terminate(ctx)
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
+// CreateTestDB creates a test database connection using shared global resources
+func CreateTestDB(t *testing.T) *TestDB {
+	// Clean tables before test
+	CleanupTables(t)
 
 	return &TestDB{
-		DB:        db,
-		Container: container,
-		Ctx:       ctx,
-	}
-}
-
-// Cleanup closes the database connection and stops the container
-func (tdb *TestDB) Cleanup(t *testing.T) {
-	if tdb.Container != nil {
-		if err := tdb.Container.Terminate(tdb.Ctx); err != nil {
-			t.Logf("Warning: Failed to terminate container: %v", err)
-		}
+		DB:  GetTestDB(),
+		Ctx: GetTestContext(),
 	}
 }
 
@@ -126,14 +60,12 @@ func (tdb *TestDB) CreateAuthService() *service.AuthService {
 
 // TestSignupFlow tests the complete signup flow
 func TestSignupFlow(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Test signup
-	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+	signupResp, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -155,14 +87,12 @@ func TestSignupFlow(t *testing.T) {
 
 // TestSignupDuplicate tests duplicate email prevention
 func TestSignupDuplicate(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// First signup
-	_, err := authService.Signup(ctx, service.SignupRequest{
+	_, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -172,7 +102,7 @@ func TestSignupDuplicate(t *testing.T) {
 	}
 
 	// Duplicate signup
-	_, err = authService.Signup(ctx, service.SignupRequest{
+	_, err = authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "test@example.com",
 		Password: "anotherPassword123",
 	})
@@ -190,14 +120,12 @@ func TestSignupDuplicate(t *testing.T) {
 
 // TestLoginBeforeVerification tests that login fails before email verification
 func TestLoginBeforeVerification(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Signup
-	_, err := authService.Signup(ctx, service.SignupRequest{
+	_, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -207,7 +135,7 @@ func TestLoginBeforeVerification(t *testing.T) {
 	}
 
 	// Try to login before verification
-	_, err = authService.Login(ctx, service.LoginRequest{
+	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -225,15 +153,13 @@ func TestLoginBeforeVerification(t *testing.T) {
 
 // TestCompleteAuthFlow tests the complete authentication flow
 func TestCompleteAuthFlow(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 	otpRepo := repository.NewOTPRepository(testdb.DB)
 
 	// Step 1: Signup
-	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+	signupResp, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -245,7 +171,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 	userID := signupResp.UserID
 
 	// Step 2: Get OTP from database (simulate email)
-	otp, err := otpRepo.GetByUserID(ctx, userID)
+	otp, err := otpRepo.GetByUserID(testdb.Ctx, userID)
 	if err != nil {
 		t.Fatalf("Failed to get OTP: %v", err)
 	}
@@ -272,7 +198,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 	}
 
 	// Step 3: Verify OTP
-	verifyResp, err := authService.VerifyOTP(ctx, service.VerifyOTPRequest{
+	verifyResp, err := authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
 		UserID: userID,
 		Code:   testOTP,
 	})
@@ -290,7 +216,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 	_ = otp // otp is used for OTP retrieval validation
 
 	// Step 4: Login
-	loginResp, err := authService.Login(ctx, service.LoginRequest{
+	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "test@example.com",
 		Password: "securePassword123",
 	})
@@ -304,7 +230,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 	}
 
 	// Step 5: Validate session
-	validateResp, err := authService.ValidateSession(ctx, service.ValidateSessionRequest{
+	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
 
@@ -325,14 +251,12 @@ func TestCompleteAuthFlow(t *testing.T) {
 
 // TestSessionRefresh tests session refresh
 func TestSessionRefresh(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Complete signup, verify OTP, and login flow to get a valid session
-	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+	signupResp, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
@@ -350,7 +274,7 @@ func TestSessionRefresh(t *testing.T) {
 	otpHash, _ := hasher.Hash(testOTP)
 	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
 
-	_, err = authService.VerifyOTP(ctx, service.VerifyOTPRequest{
+	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
 		UserID: userID,
 		Code:   testOTP,
 	})
@@ -359,7 +283,7 @@ func TestSessionRefresh(t *testing.T) {
 	}
 
 	// Login to get a valid session token
-	loginResp, err := authService.Login(ctx, service.LoginRequest{
+	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
@@ -370,7 +294,7 @@ func TestSessionRefresh(t *testing.T) {
 	oldToken := loginResp.SessionToken
 
 	// Test refresh with valid token
-	refreshResp, err := authService.RefreshSession(ctx, service.RefreshSessionRequest{
+	refreshResp, err := authService.RefreshSession(testdb.Ctx, service.RefreshSessionRequest{
 		Token: oldToken,
 	})
 
@@ -391,14 +315,12 @@ func TestSessionRefresh(t *testing.T) {
 
 // TestLogout tests the logout functionality
 func TestLogout(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Step 1: Signup
-	signupResp, err := authService.Signup(ctx, service.SignupRequest{
+	signupResp, err := authService.Signup(testdb.Ctx, service.SignupRequest{
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
@@ -421,7 +343,7 @@ func TestLogout(t *testing.T) {
 	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
 
 	// Step 3: Verify OTP
-	_, err = authService.VerifyOTP(ctx, service.VerifyOTPRequest{
+	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
 		UserID: userID,
 		Code:   testOTP,
 	})
@@ -430,7 +352,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Step 4: Login
-	loginResp, err := authService.Login(ctx, service.LoginRequest{
+	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
@@ -439,7 +361,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Step 5: Verify session is valid before logout
-	validateResp, err := authService.ValidateSession(ctx, service.ValidateSessionRequest{
+	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
 	if err != nil {
@@ -451,7 +373,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Step 6: Logout
-	logoutResp, err := authService.Logout(ctx, service.LogoutRequest{
+	logoutResp, err := authService.Logout(testdb.Ctx, service.LogoutRequest{
 		Token: loginResp.SessionToken,
 	})
 	if err != nil {
@@ -463,7 +385,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Step 7: Verify session is invalid after logout
-	validateAfterLogout, err := authService.ValidateSession(ctx, service.ValidateSessionRequest{
+	validateAfterLogout, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
 	if err != nil {
@@ -479,14 +401,12 @@ func TestLogout(t *testing.T) {
 
 // TestLogoutInvalidToken tests logout with an invalid token
 func TestLogoutInvalidToken(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Try to logout with invalid token
-	_, err := authService.Logout(ctx, service.LogoutRequest{
+	_, err := authService.Logout(testdb.Ctx, service.LogoutRequest{
 		Token: "invalid-token",
 	})
 
@@ -503,14 +423,12 @@ func TestLogoutInvalidToken(t *testing.T) {
 
 // TestLogoutEmptyToken tests logout with empty token
 func TestLogoutEmptyToken(t *testing.T) {
-	ctx := context.Background()
-	testdb := SetupTestDB(ctx, t)
-	defer testdb.Cleanup(t)
+	testdb := CreateTestDB(t)
 
 	authService := testdb.CreateAuthService()
 
 	// Try to logout with empty token
-	_, err := authService.Logout(ctx, service.LogoutRequest{
+	_, err := authService.Logout(testdb.Ctx, service.LogoutRequest{
 		Token: "",
 	})
 
