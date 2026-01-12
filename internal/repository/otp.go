@@ -25,11 +25,11 @@ func (r *OTPRepository) Create(ctx context.Context, otp *domain.OTP) error {
 	return r.db.WithContext(ctx).Create(otp).Error
 }
 
-// GetByUserID retrieves OTP by user ID (excludes soft-deleted)
-func (r *OTPRepository) GetByUserID(ctx context.Context, userID int64) (*domain.OTP, error) {
+// GetByOTPHash retrieves OTP by OTP hash (excludes soft-deleted)
+func (r *OTPRepository) GetByOTPHash(ctx context.Context, otpHash string) (*domain.OTP, error) {
 	var otp domain.OTP
 	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND deleted_at IS NULL", userID).
+		Where("otp_hash = ? AND deleted_at IS NULL", otpHash).
 		First(&otp).Error
 
 	if err != nil {
@@ -42,8 +42,16 @@ func (r *OTPRepository) GetByUserID(ctx context.Context, userID int64) (*domain.
 	return &otp, nil
 }
 
-// SoftDelete soft-deletes an OTP record
-func (r *OTPRepository) SoftDelete(ctx context.Context, userID int64) error {
+// SoftDelete soft-deletes an OTP record by OTP hash
+func (r *OTPRepository) SoftDeleteByOTPHash(ctx context.Context, otpHash string) error {
+	return r.db.WithContext(ctx).
+		Model(&domain.OTP{}).
+		Where("otp_hash = ?", otpHash).
+		Update("deleted_at", time.Now()).Error
+}
+
+// SoftDelete soft-deletes an OTP record by user ID (deprecated, use SoftDeleteByOTPHash)
+func (r *OTPRepository) SoftDeleteByUserID(ctx context.Context, userID int64) error {
 	return r.db.WithContext(ctx).
 		Model(&domain.OTP{}).
 		Where("user_id = ?", userID).

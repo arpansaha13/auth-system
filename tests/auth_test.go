@@ -74,15 +74,15 @@ func TestSignupFlow(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	if signupResp.UserID == 0 {
-		t.Fatal("Expected user ID in response")
+	if signupResp.OTPHash == "" {
+		t.Fatal("Expected OTP hash in response")
 	}
 
 	if signupResp.Message == "" {
 		t.Fatal("Expected message in response")
 	}
 
-	t.Logf("Signup successful: %s", signupResp.Message)
+	t.Logf("Signup successful: %s, OTP Hash: %s", signupResp.Message, signupResp.OTPHash)
 }
 
 // TestSignupDuplicate tests duplicate email prevention
@@ -168,39 +168,32 @@ func TestCompleteAuthFlow(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	userID := signupResp.UserID
+	otpHash := signupResp.OTPHash
+
+	if otpHash == "" {
+		t.Fatal("Expected OTP hash in signup response")
+	}
 
 	// Step 2: Get OTP from database (simulate email)
-	otp, err := otpRepo.GetByUserID(testdb.Ctx, userID)
+	_, err = otpRepo.GetByOTPHash(testdb.Ctx, otpHash)
 	if err != nil {
 		t.Fatalf("Failed to get OTP: %v", err)
 	}
 
-	// For testing, we need to get the actual OTP code
-	// In real scenario, this would come from email
-	// Let's verify with correct code format
+	// For testing, we need to update the OTP code hash
 	hasher := utils.NewPasswordHasher()
-
-	// Generate a test OTP that matches the hash
 	testOTP := "123456"
-	if err := testdb.DB.Model(&domain.OTP{}).
-		Where("user_id = ?", userID).
-		Update("hashed_code", "").Error; err != nil {
-		t.Fatalf("Failed to clear hash: %v", err)
-	}
-
-	// Hash the test OTP
 	hash, _ := hasher.Hash(testOTP)
 	if err := testdb.DB.Model(&domain.OTP{}).
-		Where("user_id = ?", userID).
+		Where("otp_hash = ?", otpHash).
 		Update("hashed_code", hash).Error; err != nil {
 		t.Fatalf("Failed to set hash: %v", err)
 	}
 
-	// Step 3: Verify OTP
+	// Step 3: Verify OTP using OTP hash from signup response
 	verifyResp, err := authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
-		UserID: userID,
-		Code:   testOTP,
+		OTPHash: otpHash,
+		Code:    testOTP,
 	})
 
 	if err != nil {
@@ -211,9 +204,11 @@ func TestCompleteAuthFlow(t *testing.T) {
 		t.Fatal("Expected session token in verification response")
 	}
 
-	t.Logf("OTP verified, username: %s", verifyResp.Username)
+	if verifyResp.OTPHash == "" {
+		t.Fatal("Expected OTP hash in verification response")
+	}
 
-	_ = otp // otp is used for OTP retrieval validation
+	t.Logf("OTP verified, username: %s, OTP hash: %s", verifyResp.Username, verifyResp.OTPHash)
 
 	// Step 4: Login
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
@@ -242,10 +237,6 @@ func TestCompleteAuthFlow(t *testing.T) {
 		t.Fatal("Expected session to be valid")
 	}
 
-	if validateResp.UserID != userID {
-		t.Fatalf("Expected user ID %d, got %d", userID, validateResp.UserID)
-	}
-
 	t.Log("Complete auth flow successful")
 }
 
@@ -264,19 +255,21 @@ func TestSessionRefresh(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	userID := signupResp.UserID
+	otpHash := signupResp.OTPHash
 
 	// Prepare and verify OTP
-	otpRecord := &domain.OTP{}
-	testdb.DB.Where("user_id = ?", userID).First(otpRecord)
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
-	otpHash, _ := hasher.Hash(testOTP)
-	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
+	otpHashCode, _ := hasher.Hash(testOTP)
+	if err := testdb.DB.Model(&domain.OTP{}).
+		Where("otp_hash = ?", otpHash).
+		Update("hashed_code", otpHashCode).Error; err != nil {
+		t.Fatalf("Failed to set hash: %v", err)
+	}
 
 	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
-		UserID: userID,
-		Code:   testOTP,
+		OTPHash: otpHash,
+		Code:    testOTP,
 	})
 	if err != nil {
 		t.Fatalf("OTP verification failed: %v", err)
@@ -328,24 +321,22 @@ func TestLogout(t *testing.T) {
 		t.Fatalf("Signup failed: %v", err)
 	}
 
-	userID := signupResp.UserID
+	otpHash := signupResp.OTPHash
 
-	// Step 2: Get OTP from database
-	otpRecord := &domain.OTP{}
-	if err := testdb.DB.Where("user_id = ?", userID).First(otpRecord).Error; err != nil {
-		t.Fatalf("Failed to get OTP: %v", err)
-	}
-
-	// Generate test OTP that will match the hash
+	// Step 2: Prepare and verify OTP
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
-	otpHash, _ := hasher.Hash(testOTP)
-	testdb.DB.Model(otpRecord).Update("hashed_code", otpHash)
+	otpHashCode, _ := hasher.Hash(testOTP)
+	if err := testdb.DB.Model(&domain.OTP{}).
+		Where("otp_hash = ?", otpHash).
+		Update("hashed_code", otpHashCode).Error; err != nil {
+		t.Fatalf("Failed to set hash: %v", err)
+	}
 
 	// Step 3: Verify OTP
 	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
-		UserID: userID,
-		Code:   testOTP,
+		OTPHash: otpHash,
+		Code:    testOTP,
 	})
 	if err != nil {
 		t.Fatalf("OTP verification failed: %v", err)

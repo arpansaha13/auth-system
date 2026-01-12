@@ -60,10 +60,10 @@ type SignupRequest struct {
 	Password string // User's password (minimum 8 characters)
 }
 
-// SignupResponse represents signup output with confirmation message and user ID
+// SignupResponse represents signup output with confirmation message and OTP hash
 type SignupResponse struct {
 	Message string // Confirmation message ("signup successful, check your email for otp")
-	UserID  int64  // Bigint ID of the newly created user
+	OTPHash string // Unique OTP hash to be sent back during verification
 }
 
 // Signup registers a new user with email and password.
@@ -115,14 +115,23 @@ func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupRes
 		return nil, &domain.InternalError{Message: "failed to generate otp", Err: err}
 	}
 
-	otpHash, err := s.hasher.Hash(otp)
+	// Generate random hash for OTP identification
+	otpHash, err := utils.GenerateToken(32)
+	if err != nil {
+		return nil, &domain.InternalError{Message: "failed to generate otp hash", Err: err}
+	}
+
+	// Hash the OTP code for verification
+	hashedCode, err := s.hasher.Hash(otp)
 	if err != nil {
 		return nil, &domain.InternalError{Message: "failed to process otp", Err: err}
 	}
 
 	otpRecord := &domain.OTP{
 		UserID:     newUser.ID,
-		HashedCode: otpHash,
+		OTPHash:    otpHash,
+		HashedCode: hashedCode,
+		Purpose:    1, // 1 = email verification after signup
 		ExpiresAt:  time.Now().Add(s.config.OTPExpiry),
 	}
 
@@ -140,20 +149,21 @@ func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupRes
 
 	return &SignupResponse{
 		Message: "signup successful, check your email for otp",
-		UserID:  newUser.ID,
+		OTPHash: otpRecord.OTPHash,
 	}, nil
 }
 
-// VerifyOTPRequest represents OTP verification input with user ID and OTP code
+// VerifyOTPRequest represents OTP verification input with OTP hash and OTP code
 type VerifyOTPRequest struct {
-	UserID int64  // Bigint ID of the user who received the OTP
-	Code   string // 6-digit OTP code from email
+	OTPHash string // Unique OTP hash received during signup
+	Code    string // 6-digit OTP code from email
 }
 
-// VerifyOTPResponse represents OTP verification output with username and initial session
+// VerifyOTPResponse represents OTP verification output with username, OTP hash, and initial session
 type VerifyOTPResponse struct {
 	Message      string // Confirmation message
 	Username     string // Auto-generated username (email_prefix + 6 random digits)
+	OTPHash      string // OTP hash for reference
 	SessionToken string // Initial session token for immediate authentication
 }
 
@@ -168,8 +178,17 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 		return nil, &domain.ValidationError{Message: "invalid otp format", Field: "code"}
 	}
 
-	// UserID is already validated as int64
-	userID := req.UserID
+	if req.OTPHash == "" {
+		return nil, &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"}
+	}
+
+	// Get OTP by hash
+	otpRecord, err := s.otpRepo.GetByOTPHash(ctx, req.OTPHash)
+	if err != nil {
+		return nil, err
+	}
+
+	userID := otpRecord.UserID
 
 	// Get user
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -180,12 +199,6 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 	// Check if already verified
 	if user.Verified {
 		return nil, &domain.ValidationError{Message: "user already verified", Field: ""}
-	}
-
-	// Get OTP
-	otpRecord, err := s.otpRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, err
 	}
 
 	// Check expiry
@@ -210,8 +223,8 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 		return nil, &domain.InternalError{Message: "failed to update user", Err: err}
 	}
 
-	// Delete OTP
-	if err := s.otpRepo.SoftDelete(ctx, userID); err != nil {
+	// Delete OTP by hash
+	if err := s.otpRepo.SoftDeleteByOTPHash(ctx, req.OTPHash); err != nil {
 		return nil, &domain.InternalError{Message: "failed to clean up otp", Err: err}
 	}
 
@@ -235,6 +248,7 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 	return &VerifyOTPResponse{
 		Message:      "otp verified successfully",
 		Username:     username,
+		OTPHash:      req.OTPHash,
 		SessionToken: sessionToken,
 	}, nil
 }

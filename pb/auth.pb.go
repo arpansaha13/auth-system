@@ -78,8 +78,8 @@ func (x *SignupRequest) GetPassword() string {
 // SignupResponse returns confirmation message and newly created user_id.
 type SignupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`              // Confirmation message
-	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Bigint ID of the newly created user
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`                // Confirmation message
+	OtpHash       string                 `protobuf:"bytes,2,opt,name=otp_hash,json=otpHash,proto3" json:"otp_hash,omitempty"` // Unique OTP hash received during signup
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -121,18 +121,18 @@ func (x *SignupResponse) GetMessage() string {
 	return ""
 }
 
-func (x *SignupResponse) GetUserId() int64 {
+func (x *SignupResponse) GetOtpHash() string {
 	if x != nil {
-		return x.UserId
+		return x.OtpHash
 	}
-	return 0
+	return ""
 }
 
 // VerifyOTPRequest contains user_id and OTP code for email verification.
 type VerifyOTPRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Bigint ID of the user
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`                    // 6-digit OTP code sent to email
+	OtpHash       string                 `protobuf:"bytes,1,opt,name=otp_hash,json=otpHash,proto3" json:"otp_hash,omitempty"` // Unique OTP hash received during signup
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`                      // 6-digit OTP code sent to email
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -167,11 +167,11 @@ func (*VerifyOTPRequest) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *VerifyOTPRequest) GetUserId() int64 {
+func (x *VerifyOTPRequest) GetOtpHash() string {
 	if x != nil {
-		return x.UserId
+		return x.OtpHash
 	}
-	return 0
+	return ""
 }
 
 func (x *VerifyOTPRequest) GetCode() string {
@@ -1082,12 +1082,12 @@ const file_auth_proto_rawDesc = "" +
 	"auth.proto\x12\x04auth\x1a\x1fgoogle/protobuf/timestamp.proto\"A\n" +
 	"\rSignupRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"C\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"E\n" +
 	"\x0eSignupResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\x03R\x06userId\"?\n" +
-	"\x10VerifyOTPRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x12\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x19\n" +
+	"\botp_hash\x18\x02 \x01(\tR\aotpHash\"A\n" +
+	"\x10VerifyOTPRequest\x12\x19\n" +
+	"\botp_hash\x18\x01 \x01(\tR\aotpHash\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\"n\n" +
 	"\x11VerifyOTPResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1a\n" +

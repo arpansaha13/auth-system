@@ -48,7 +48,7 @@ func (s *AuthServiceImpl) Signup(ctx context.Context, req *pb.SignupRequest) (*p
 
 	return &pb.SignupResponse{
 		Message: resp.Message,
-		UserId:  resp.UserID,
+		OtpHash: resp.OTPHash,
 	}, nil
 }
 
@@ -62,8 +62,8 @@ func (s *AuthServiceImpl) VerifyOTP(ctx context.Context, req *pb.VerifyOTPReques
 
 	// Call service
 	serviceReq := service.VerifyOTPRequest{
-		UserID: req.UserId,
-		Code:   req.Code,
+		OTPHash: req.OtpHash,
+		Code:    req.Code,
 	}
 
 	resp, err := s.authService.VerifyOTP(ctx, serviceReq)
@@ -191,8 +191,8 @@ func validateSignupRequest(req *pb.SignupRequest) error {
 }
 
 func validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
-	if req.UserId == 0 {
-		return &domain.ValidationError{Message: "user_id is required", Field: "user_id"}
+	if req.OtpHash == "" {
+		return &domain.ValidationError{Message: "otp_hash is required", Field: "otp_hash"}
 	}
 	if req.Code == "" {
 		return &domain.ValidationError{Message: "code is required", Field: "code"}

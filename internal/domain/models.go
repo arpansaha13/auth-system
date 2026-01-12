@@ -58,10 +58,14 @@ func (Credentials) TableName() string {
 
 // OTP represents the otps table (one-to-one)
 type OTP struct {
-	UserID     int64      `gorm:"primaryKey;references:ID"`
+	ID         int64      `gorm:"primaryKey;autoIncrement"`
+	UserID     int64      `gorm:"not null;index"`
+	OTPHash    string     `gorm:"type:varchar(255);uniqueIndex;not null"`
 	HashedCode string     `gorm:"type:varchar(255);not null"`
+	Purpose    int16      `gorm:"not null;default:1;index"`
 	ExpiresAt  time.Time  `gorm:"not null"`
 	DeletedAt  *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete
+	CreatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP"`
 
 	// Relation
 	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`

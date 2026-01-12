@@ -23,10 +23,14 @@ CREATE TABLE credentials (
 
 -- OTP Storage
 CREATE TABLE otps (
-    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    hashed_code VARCHAR(255) NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    otp_hash VARCHAR(255) NOT NULL UNIQUE, -- Random hash to identify OTP
+    hashed_code VARCHAR(255) NOT NULL, -- Hashed OTP code
+    purpose SMALLINT NOT NULL DEFAULT 1, -- 1 = email verification after signup
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    deleted_at TIMESTAMP WITH TIME ZONE -- Soft delete timestamp
+    deleted_at TIMESTAMP WITH TIME ZONE, -- Soft delete timestamp
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Sessions Table
@@ -43,3 +47,6 @@ CREATE TABLE sessions (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_sessions_token ON sessions(token_hash);
+CREATE INDEX idx_otps_user_id ON otps(user_id);
+CREATE INDEX idx_otps_otp_hash ON otps(otp_hash);
+CREATE INDEX idx_otps_purpose ON otps(purpose);

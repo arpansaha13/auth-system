@@ -61,12 +61,12 @@ message SignupRequest {
 // SignupResponse returns confirmation message and newly created user_id.
 message SignupResponse {
     string message = 1; // Confirmation message
-    int64 user_id = 2; // Bigint ID of the newly created user
+    string otp_hash = 2; // Unique OTP hash received during signup
 }
 
 // VerifyOTPRequest contains user_id and OTP code for email verification.
 message VerifyOTPRequest {
-    int64 user_id = 1; // Bigint ID of the user
+    string otp_hash = 1; // Unique OTP hash received during signup
     string code = 2; // 6-digit OTP code sent to email
 }
 
