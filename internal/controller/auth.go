@@ -16,11 +16,11 @@ import (
 // AuthServiceImpl implements the gRPC AuthService
 type AuthServiceImpl struct {
 	pb.UnimplementedAuthServiceServer
-	authService *service.AuthService
+	authService service.IAuthService
 }
 
 // NewAuthServiceImpl creates a new auth service implementation
-func NewAuthServiceImpl(authService *service.AuthService) *AuthServiceImpl {
+func NewAuthServiceImpl(authService service.IAuthService) *AuthServiceImpl {
 	return &AuthServiceImpl{
 		authService: authService,
 	}
