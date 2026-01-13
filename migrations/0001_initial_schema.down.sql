@@ -2,7 +2,6 @@
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS otps;
 DROP TABLE IF EXISTS credentials;
-DROP TABLE IF EXISTS profiles;
 
 -- 2. Drop the parent table last
 DROP TABLE IF EXISTS users;

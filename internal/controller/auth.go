@@ -178,7 +178,7 @@ func (s *AuthServiceImpl) Logout(ctx context.Context, req *pb.LogoutRequest) (*p
 	}, nil
 }
 
-// Private helper functions
+// Private helper and validation functions
 
 func validateSignupRequest(req *pb.SignupRequest) error {
 	if req.Email == "" {

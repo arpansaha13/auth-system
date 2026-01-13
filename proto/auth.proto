@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package auth;
+package proto;
 option go_package = "./pb";
 
 import "google/protobuf/timestamp.proto";
@@ -35,20 +35,16 @@ service AuthService {
     // After logout, token becomes invalid.
     rpc Logout(LogoutRequest) returns (LogoutResponse);
 
-    // GetUser retrieves user profile information by user_id.
+    // GetUser retrieves user information by user_id.
     // Used by other microservices to fetch user details.
     rpc GetUser(GetUserRequest) returns (GetUserResponse);
 
-    // UpdateUserProfile updates user profile information (first_name, last_name).
-    // Returns updated user profile.
-    rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
-
     // GetUserByEmail retrieves user details by email address.
-    // Used internally for user lookup during login and verification.
+    // Used for user lookup operations.
     rpc GetUserByEmail(GetUserByEmailRequest) returns (GetUserByEmailResponse);
 
-    // DeleteUser deletes a user and all associated data (soft delete for sessions/OTPs).
-    // Returns confirmation message.
+    // DeleteUser deletes a user and all associated data.
+    // This is used when users close their accounts.
     rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
 }
 
@@ -117,37 +113,23 @@ message LogoutResponse {
     string message = 1; // Confirmation message ("logout successful")
 }
 
-// GetUserRequest contains user_id for profile retrieval.
+// GetUserRequest contains user_id for user retrieval.
 message GetUserRequest {
     int64 user_id = 1; // Bigint ID of the user
 }
 
-// UserProfile contains user information.
-message UserProfile {
+// UserData contains user information.
+message UserData {
     int64 user_id = 1; // Bigint ID of the user
     string email = 2; // User's email address
     string username = 3; // User's username (auto-generated on verification)
     bool verified = 4; // Whether user has verified email
-    string first_name = 5; // User's first name (optional)
-    string last_name = 6; // User's last name (optional)
-    google.protobuf.Timestamp created_at = 7; // User creation timestamp (UTC)
+    google.protobuf.Timestamp created_at = 5; // User creation timestamp (UTC)
 }
 
-// GetUserResponse returns user profile information.
+// GetUserResponse returns user information.
 message GetUserResponse {
-    UserProfile user = 1; // Complete user profile
-}
-
-// UpdateUserProfileRequest contains profile update information.
-message UpdateUserProfileRequest {
-    int64 user_id = 1; // Bigint ID of the user to update
-    string first_name = 2; // New first name (optional, leave empty to skip)
-    string last_name = 3; // New last name (optional, leave empty to skip)
-}
-
-// UpdateUserProfileResponse returns updated user profile.
-message UpdateUserProfileResponse {
-    UserProfile user = 1; // Updated user profile
+    UserData user = 1; // User information
 }
 
 // GetUserByEmailRequest contains email for user lookup.
@@ -157,7 +139,7 @@ message GetUserByEmailRequest {
 
 // GetUserByEmailResponse returns user information for given email.
 message GetUserByEmailResponse {
-    UserProfile user = 1; // User profile with given email
+    UserData user = 1; // User information with given email
 }
 
 // DeleteUserRequest contains user_id for deletion.

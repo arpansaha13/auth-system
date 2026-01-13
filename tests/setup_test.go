@@ -117,7 +117,7 @@ func GetTestContext() context.Context {
 
 // CleanupTables truncates all tables to ensure test isolation
 func CleanupTables(t *testing.T) {
-	tables := []string{"sessions", "otps", "credentials", "profiles", "users"}
+	tables := []string{"sessions", "otps", "credentials", "users"}
 
 	for _, table := range tables {
 		if err := globalDB.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error; err != nil {

@@ -34,12 +34,6 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User, credenti
 			return err
 		}
 
-		// Create empty profile
-		profile := &domain.Profile{UserID: user.ID}
-		if err := tx.Create(profile).Error; err != nil {
-			return err
-		}
-
 		return nil
 	})
 }
@@ -50,7 +44,6 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 	err := r.db.WithContext(ctx).
 		Preload("Credentials").
 		Preload("OTP").
-		Preload("Profile").
 		Where("email = ?", email).
 		First(&user).Error
 
@@ -70,7 +63,6 @@ func (r *UserRepository) GetByID(ctx context.Context, userID int64) (*domain.Use
 	err := r.db.WithContext(ctx).
 		Preload("Credentials").
 		Preload("OTP").
-		Preload("Profile").
 		Where("id = ?", userID).
 		First(&user).Error
 
@@ -90,7 +82,6 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*d
 	err := r.db.WithContext(ctx).
 		Preload("Credentials").
 		Preload("OTP").
-		Preload("Profile").
 		Where("username = ?", username).
 		First(&user).Error
 
@@ -152,4 +143,11 @@ func (r *UserRepository) ExistsEmail(ctx context.Context, email string) (bool, e
 	}
 
 	return count > 0, nil
+}
+
+// Delete hard-deletes a user and all related data (cascade delete)
+func (r *UserRepository) Delete(ctx context.Context, userID int64) error {
+	return r.db.WithContext(ctx).
+		Where("id = ?", userID).
+		Delete(&domain.User{}).Error
 }

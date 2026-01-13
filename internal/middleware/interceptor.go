@@ -86,9 +86,9 @@ func extractTokenFromMetadata(ctx context.Context) string {
 
 func isPublicEndpoint(fullMethod string) bool {
 	publicEndpoints := map[string]bool{
-		"/auth.AuthService/Signup":    true,
-		"/auth.AuthService/Login":     true,
-		"/auth.AuthService/VerifyOTP": true,
+		"/proto.AuthService/Signup":    true,
+		"/proto.AuthService/Login":     true,
+		"/proto.AuthService/VerifyOTP": true,
 	}
 
 	return publicEndpoints[fullMethod]

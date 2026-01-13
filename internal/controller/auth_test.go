@@ -16,16 +16,15 @@ import (
 
 // MockAuthService mocks the auth service for controller tests
 type MockAuthService struct {
-	SignupFunc            func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error)
-	VerifyOTPFunc         func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error)
-	LoginFunc             func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error)
-	ValidateSessionFunc   func(ctx context.Context, req service.ValidateSessionRequest) (*service.ValidateSessionResponse, error)
-	RefreshSessionFunc    func(ctx context.Context, req service.RefreshSessionRequest) (*service.RefreshSessionResponse, error)
-	LogoutFunc            func(ctx context.Context, req service.LogoutRequest) (*service.LogoutResponse, error)
-	GetUserFunc           func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
-	UpdateUserProfileFunc func(ctx context.Context, req service.UpdateUserProfileRequest) (*service.UpdateUserProfileResponse, error)
-	GetUserByEmailFunc    func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error)
-	DeleteUserFunc        func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error)
+	SignupFunc          func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error)
+	VerifyOTPFunc       func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error)
+	LoginFunc           func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error)
+	ValidateSessionFunc func(ctx context.Context, req service.ValidateSessionRequest) (*service.ValidateSessionResponse, error)
+	RefreshSessionFunc  func(ctx context.Context, req service.RefreshSessionRequest) (*service.RefreshSessionResponse, error)
+	LogoutFunc          func(ctx context.Context, req service.LogoutRequest) (*service.LogoutResponse, error)
+	GetUserFunc         func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
+	GetUserByEmailFunc  func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error)
+	DeleteUserFunc      func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error)
 }
 
 func (m *MockAuthService) Signup(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
@@ -75,22 +74,10 @@ func (m *MockAuthService) GetUser(ctx context.Context, req service.GetUserReques
 		return m.GetUserFunc(ctx, req)
 	}
 	return &service.GetUserResponse{
-		User: service.UserProfile{
+		User: service.UserData{
 			UserID:   1,
 			Email:    "test@example.com",
 			Username: "test_user",
-		},
-	}, nil
-}
-
-func (m *MockAuthService) UpdateUserProfile(ctx context.Context, req service.UpdateUserProfileRequest) (*service.UpdateUserProfileResponse, error) {
-	if m.UpdateUserProfileFunc != nil {
-		return m.UpdateUserProfileFunc(ctx, req)
-	}
-	return &service.UpdateUserProfileResponse{
-		User: service.UserProfile{
-			UserID: 1,
-			Email:  "test@example.com",
 		},
 	}, nil
 }
@@ -100,9 +87,10 @@ func (m *MockAuthService) GetUserByEmail(ctx context.Context, req service.GetUse
 		return m.GetUserByEmailFunc(ctx, req)
 	}
 	return &service.GetUserByEmailResponse{
-		User: service.UserProfile{
-			UserID: 1,
-			Email:  req.Email,
+		User: service.UserData{
+			UserID:   1,
+			Email:    req.Email,
+			Username: "test_user",
 		},
 	}, nil
 }

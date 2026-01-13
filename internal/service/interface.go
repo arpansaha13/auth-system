@@ -10,4 +10,7 @@ type IAuthService interface {
 	ValidateSession(ctx context.Context, req ValidateSessionRequest) (*ValidateSessionResponse, error)
 	RefreshSession(ctx context.Context, req RefreshSessionRequest) (*RefreshSessionResponse, error)
 	Logout(ctx context.Context, req LogoutRequest) (*LogoutResponse, error)
+	GetUser(ctx context.Context, req GetUserRequest) (*GetUserResponse, error)
+	GetUserByEmail(ctx context.Context, req GetUserByEmailRequest) (*GetUserByEmailResponse, error)
+	DeleteUser(ctx context.Context, req DeleteUserRequest) (*DeleteUserResponse, error)
 }

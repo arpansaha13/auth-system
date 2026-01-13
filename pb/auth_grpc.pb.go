@@ -19,16 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Signup_FullMethodName            = "/auth.AuthService/Signup"
-	AuthService_VerifyOTP_FullMethodName         = "/auth.AuthService/VerifyOTP"
-	AuthService_Login_FullMethodName             = "/auth.AuthService/Login"
-	AuthService_ValidateSession_FullMethodName   = "/auth.AuthService/ValidateSession"
-	AuthService_RefreshSession_FullMethodName    = "/auth.AuthService/RefreshSession"
-	AuthService_Logout_FullMethodName            = "/auth.AuthService/Logout"
-	AuthService_GetUser_FullMethodName           = "/auth.AuthService/GetUser"
-	AuthService_UpdateUserProfile_FullMethodName = "/auth.AuthService/UpdateUserProfile"
-	AuthService_GetUserByEmail_FullMethodName    = "/auth.AuthService/GetUserByEmail"
-	AuthService_DeleteUser_FullMethodName        = "/auth.AuthService/DeleteUser"
+	AuthService_Signup_FullMethodName          = "/proto.AuthService/Signup"
+	AuthService_VerifyOTP_FullMethodName       = "/proto.AuthService/VerifyOTP"
+	AuthService_Login_FullMethodName           = "/proto.AuthService/Login"
+	AuthService_ValidateSession_FullMethodName = "/proto.AuthService/ValidateSession"
+	AuthService_RefreshSession_FullMethodName  = "/proto.AuthService/RefreshSession"
+	AuthService_Logout_FullMethodName          = "/proto.AuthService/Logout"
+	AuthService_GetUser_FullMethodName         = "/proto.AuthService/GetUser"
+	AuthService_GetUserByEmail_FullMethodName  = "/proto.AuthService/GetUserByEmail"
+	AuthService_DeleteUser_FullMethodName      = "/proto.AuthService/DeleteUser"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -59,17 +58,14 @@ type AuthServiceClient interface {
 	// Token is extracted from request metadata (Authorization header).
 	// After logout, token becomes invalid.
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
-	// GetUser retrieves user profile information by user_id.
+	// GetUser retrieves user information by user_id.
 	// Used by other microservices to fetch user details.
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
-	// UpdateUserProfile updates user profile information (first_name, last_name).
-	// Returns updated user profile.
-	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UpdateUserProfileResponse, error)
 	// GetUserByEmail retrieves user details by email address.
-	// Used internally for user lookup during login and verification.
+	// Used for user lookup operations.
 	GetUserByEmail(ctx context.Context, in *GetUserByEmailRequest, opts ...grpc.CallOption) (*GetUserByEmailResponse, error)
-	// DeleteUser deletes a user and all associated data (soft delete for sessions/OTPs).
-	// Returns confirmation message.
+	// DeleteUser deletes a user and all associated data.
+	// This is used when users close their accounts.
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
 }
 
@@ -151,16 +147,6 @@ func (c *authServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opt
 	return out, nil
 }
 
-func (c *authServiceClient) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UpdateUserProfileResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateUserProfileResponse)
-	err := c.cc.Invoke(ctx, AuthService_UpdateUserProfile_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *authServiceClient) GetUserByEmail(ctx context.Context, in *GetUserByEmailRequest, opts ...grpc.CallOption) (*GetUserByEmailResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetUserByEmailResponse)
@@ -209,17 +195,14 @@ type AuthServiceServer interface {
 	// Token is extracted from request metadata (Authorization header).
 	// After logout, token becomes invalid.
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
-	// GetUser retrieves user profile information by user_id.
+	// GetUser retrieves user information by user_id.
 	// Used by other microservices to fetch user details.
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
-	// UpdateUserProfile updates user profile information (first_name, last_name).
-	// Returns updated user profile.
-	UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error)
 	// GetUserByEmail retrieves user details by email address.
-	// Used internally for user lookup during login and verification.
+	// Used for user lookup operations.
 	GetUserByEmail(context.Context, *GetUserByEmailRequest) (*GetUserByEmailResponse, error)
-	// DeleteUser deletes a user and all associated data (soft delete for sessions/OTPs).
-	// Returns confirmation message.
+	// DeleteUser deletes a user and all associated data.
+	// This is used when users close their accounts.
 	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
@@ -251,9 +234,6 @@ func (UnimplementedAuthServiceServer) Logout(context.Context, *LogoutRequest) (*
 }
 func (UnimplementedAuthServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
-}
-func (UnimplementedAuthServiceServer) UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateUserProfile not implemented")
 }
 func (UnimplementedAuthServiceServer) GetUserByEmail(context.Context, *GetUserByEmailRequest) (*GetUserByEmailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserByEmail not implemented")
@@ -408,24 +388,6 @@ func _AuthService_GetUser_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AuthService_UpdateUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateUserProfileRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthServiceServer).UpdateUserProfile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AuthService_UpdateUserProfile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServiceServer).UpdateUserProfile(ctx, req.(*UpdateUserProfileRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _AuthService_GetUserByEmail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetUserByEmailRequest)
 	if err := dec(in); err != nil {
@@ -466,7 +428,7 @@ func _AuthService_DeleteUser_Handler(srv interface{}, ctx context.Context, dec f
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AuthService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "auth.AuthService",
+	ServiceName: "proto.AuthService",
 	HandlerType: (*AuthServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -496,10 +458,6 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUser",
 			Handler:    _AuthService_GetUser_Handler,
-		},
-		{
-			MethodName: "UpdateUserProfile",
-			Handler:    _AuthService_UpdateUserProfile_Handler,
 		},
 		{
 			MethodName: "GetUserByEmail",

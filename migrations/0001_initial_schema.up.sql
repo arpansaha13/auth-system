@@ -8,13 +8,6 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Profiles Table (One-to-One)
-CREATE TABLE profiles (
-    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100)
-);
-
 -- Credentials Table (One-to-One)
 CREATE TABLE credentials (
     user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

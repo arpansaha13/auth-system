@@ -16,7 +16,6 @@ type User struct {
 	CreatedAt time.Time
 
 	// Relations
-	Profile     *Profile     `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Credentials *Credentials `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	OTP         *OTP         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Sessions    []Session    `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
@@ -25,21 +24,6 @@ type User struct {
 // TableName specifies the table name for the User model
 func (User) TableName() string {
 	return "users"
-}
-
-// Profile represents the profiles table (one-to-one)
-type Profile struct {
-	UserID    int64   `gorm:"primaryKey;references:ID"`
-	FirstName *string `gorm:"type:varchar(100)"`
-	LastName  *string `gorm:"type:varchar(100)"`
-
-	// Relation
-	User *User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
-}
-
-// TableName specifies the table name for the Profile model
-func (Profile) TableName() string {
-	return "profiles"
 }
 
 // Credentials represents the credentials table (one-to-one)
@@ -98,7 +82,6 @@ func (Session) TableName() string {
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&User{},
-		&Profile{},
 		&Credentials{},
 		&OTP{},
 		&Session{},
