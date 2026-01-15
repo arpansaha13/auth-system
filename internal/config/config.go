@@ -17,12 +17,12 @@ type Config struct {
 	GRPCPort string
 
 	// Session
-	SessionTTL              time.Duration
-	SessionCleanupInterval  time.Duration
+	SessionTTL             time.Duration
+	SessionCleanupInterval time.Duration
 
 	// Security
-	SecretKey  string
-	JWTSecret  string
+	SecretKey string
+	JWTSecret string
 
 	// Email
 	SMTPHost     string
@@ -48,19 +48,19 @@ type Config struct {
 func Load() (*Config, error) {
 
 	cfg := &Config{
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		GRPCHost:    getEnv("GRPC_HOST", "0.0.0.0"),
-		GRPCPort:    getEnv("GRPC_PORT", "50051"),
-		SecretKey:   getEnv("SECRET_KEY", ""),
-		JWTSecret:   getEnv("JWT_SECRET", ""),
-		SMTPHost:    getEnv("SMTP_HOST", "localhost"),
-		SMTPPort:    getEnvInt("SMTP_PORT", 1025),
-		SMTPUser:    getEnv("SMTP_USER", ""),
-		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-		EmailFrom:   getEnv("EMAIL_FROM", "noreply@example.com"),
-		Environment: getEnv("ENVIRONMENT", "development"),
-		LogLevel:    getEnv("LOG_LEVEL", "info"),
-		OTPLength:   getEnvInt("OTP_LENGTH", 6),
+		DatabaseURL:         getEnv("DATABASE_URL", ""),
+		GRPCHost:            getEnv("GRPC_HOST", "0.0.0.0"),
+		GRPCPort:            getEnv("GRPC_PORT", "50051"),
+		SecretKey:           getEnv("SECRET_KEY", ""),
+		JWTSecret:           getEnv("JWT_SECRET", ""),
+		SMTPHost:            getEnv("SMTP_HOST", "localhost"),
+		SMTPPort:            getEnvInt("SMTP_PORT", 587),
+		SMTPUser:            getEnv("SMTP_USER", ""),
+		SMTPPassword:        getEnv("SMTP_PASSWORD", ""),
+		EmailFrom:           getEnv("EMAIL_FROM", "noreply@example.com"),
+		Environment:         getEnv("ENVIRONMENT", "development"),
+		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		OTPLength:           getEnvInt("OTP_LENGTH", 6),
 		EmailWorkerPoolSize: getEnvInt("EMAIL_WORKER_POOL_SIZE", 5),
 		EmailTaskQueueSize:  getEnvInt("EMAIL_TASK_QUEUE_SIZE", 100),
 	}
