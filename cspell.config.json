@@ -21,6 +21,7 @@
     "protoc",
     "repo",
     "repos",
+    "signup",
     "sslmode",
     "testcontainers",
     "unary",

@@ -54,9 +54,7 @@ func main() {
 
 	// Initialize email provider
 	var emailProvider worker.EmailProvider
-	if cfg.Environment == "development" {
-		emailProvider = worker.NewMockEmailProvider()
-	} else {
+	if cfg.Environment == "production" {
 		emailProvider = worker.NewSMTPEmailProvider(
 			cfg.SMTPHost,
 			cfg.SMTPPort,
@@ -64,6 +62,8 @@ func main() {
 			cfg.SMTPPassword,
 			cfg.EmailFrom,
 		)
+	} else {
+		emailProvider = worker.NewMockEmailProvider()
 	}
 
 	// Initialize password hasher and validator

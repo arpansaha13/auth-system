@@ -115,6 +115,14 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID int64) erro
 		Update("last_login", now).Error
 }
 
+// UpdatePassword updates the user's password hash in the credentials table
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID int64, newPasswordHash string) error {
+	return r.db.WithContext(ctx).
+		Model(&domain.Credentials{}).
+		Where("user_id = ?", userID).
+		Update("password_hash", newPasswordHash).Error
+}
+
 // ExistsUsername checks if a username already exists
 func (r *UserRepository) ExistsUsername(ctx context.Context, username string) (bool, error) {
 	var count int64

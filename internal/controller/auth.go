@@ -178,6 +178,57 @@ func (s *AuthServiceImpl) Logout(ctx context.Context, req *pb.LogoutRequest) (*p
 	}, nil
 }
 
+// ForgotPassword initiates password reset by sending OTP to email
+func (s *AuthServiceImpl) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
+	// Validate request
+	if err := validateForgotPasswordRequest(req); err != nil {
+		log.Printf("forgot password validation error: %v", err)
+		return nil, errorToGRPCError(err)
+	}
+
+	// Call service
+	serviceReq := service.ForgotPasswordRequest{
+		Email: req.Email,
+	}
+
+	resp, err := s.authService.ForgotPassword(ctx, serviceReq)
+	if err != nil {
+		log.Printf("forgot password error: %v", err)
+		return nil, errorToGRPCError(err)
+	}
+
+	return &pb.ForgotPasswordResponse{
+		Message: resp.Message,
+		OtpHash: resp.OTPHash,
+	}, nil
+}
+
+// ResetPassword verifies OTP and resets user's password
+func (s *AuthServiceImpl) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
+	// Validate request
+	if err := validateResetPasswordRequest(req); err != nil {
+		log.Printf("reset password validation error: %v", err)
+		return nil, errorToGRPCError(err)
+	}
+
+	// Call service
+	serviceReq := service.ResetPasswordRequest{
+		OTPHash:  req.OtpHash,
+		Code:     req.Code,
+		Password: req.Password,
+	}
+
+	resp, err := s.authService.ResetPassword(ctx, serviceReq)
+	if err != nil {
+		log.Printf("reset password error: %v", err)
+		return nil, errorToGRPCError(err)
+	}
+
+	return &pb.ResetPasswordResponse{
+		Message: resp.Message,
+	}, nil
+}
+
 // Private helper and validation functions
 
 func validateSignupRequest(req *pb.SignupRequest) error {
@@ -203,6 +254,26 @@ func validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
 func validateLoginRequest(req *pb.LoginRequest) error {
 	if req.Email == "" {
 		return &domain.ValidationError{Message: "email is required", Field: "email"}
+	}
+	if req.Password == "" {
+		return &domain.ValidationError{Message: "password is required", Field: "password"}
+	}
+	return nil
+}
+
+func validateForgotPasswordRequest(req *pb.ForgotPasswordRequest) error {
+	if req.Email == "" {
+		return &domain.ValidationError{Message: "email is required", Field: "email"}
+	}
+	return nil
+}
+
+func validateResetPasswordRequest(req *pb.ResetPasswordRequest) error {
+	if req.OtpHash == "" {
+		return &domain.ValidationError{Message: "otp_hash is required", Field: "otp_hash"}
+	}
+	if req.Code == "" {
+		return &domain.ValidationError{Message: "code is required", Field: "code"}
 	}
 	if req.Password == "" {
 		return &domain.ValidationError{Message: "password is required", Field: "password"}

@@ -176,7 +176,7 @@ func TestCompleteAuthFlow(t *testing.T) {
 	}
 
 	// Step 2: Get OTP from database (simulate email)
-	_, err = otpRepo.GetByOTPHash(testdb.Ctx, otpHash)
+	_, err = otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeSignupVerification)
 	if err != nil {
 		t.Fatalf("Failed to get OTP: %v", err)
 	}
@@ -391,6 +391,106 @@ func TestLogout(t *testing.T) {
 	t.Log("Logout successful and session invalidated")
 }
 
+// TestForgotAndResetPasswordFlow tests the complete forgot and reset password flow
+func TestForgotAndResetPasswordFlow(t *testing.T) {
+	testdb := CreateTestDB(t)
+	authService := testdb.CreateAuthService()
+	otpRepo := repository.NewOTPRepository(testdb.DB)
+
+	// Step 1: Signup and verify user
+	signupResp, err := authService.Signup(testdb.Ctx, service.SignupRequest{
+		Email:    "reset-flow@example.com",
+		Password: "oldPassword123",
+	})
+	if err != nil {
+		t.Fatalf("Signup failed: %v", err)
+	}
+
+	otpHash := signupResp.OTPHash
+
+	// Prepare OTP for verification
+	testOTP := "123456"
+	hasher := utils.NewPasswordHasher()
+	otpHashCode, _ := hasher.Hash(testOTP)
+	testdb.DB.Model(&domain.OTP{}).
+		Where("otp_hash = ?", otpHash).
+		Update("hashed_code", otpHashCode)
+
+	// Verify user
+	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
+		OTPHash: otpHash,
+		Code:    testOTP,
+	})
+	if err != nil {
+		t.Fatalf("OTP verification failed: %v", err)
+	}
+
+	// Step 2: Initiate forgot password
+	forgotResp, err := authService.ForgotPassword(testdb.Ctx, service.ForgotPasswordRequest{
+		Email: "reset-flow@example.com",
+	})
+	if err != nil {
+		t.Fatalf("ForgotPassword failed: %v", err)
+	}
+
+	forgotOTPHash := forgotResp.OTPHash
+	if forgotOTPHash == "" {
+		t.Fatal("Expected OTP hash from forgot password")
+	}
+
+	// Step 3: Get the OTP and prepare for reset
+	forgotOTP := "654321" // Different OTP
+	forgotHashCode, _ := hasher.Hash(forgotOTP)
+	testdb.DB.Model(&domain.OTP{}).
+		Where("otp_hash = ? AND purpose = ?", forgotOTPHash, 2).
+		Update("hashed_code", forgotHashCode)
+
+	// Step 4: Reset password
+	resetResp, err := authService.ResetPassword(testdb.Ctx, service.ResetPasswordRequest{
+		OTPHash:  forgotOTPHash,
+		Code:     forgotOTP,
+		Password: "newPassword123",
+	})
+	if err != nil {
+		t.Fatalf("ResetPassword failed: %v", err)
+	}
+
+	if resetResp.Message != "password reset successfully" {
+		t.Fatalf("Expected reset success message, got: %s", resetResp.Message)
+	}
+
+	// Step 5: Verify old password no longer works
+	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
+		Email:    "reset-flow@example.com",
+		Password: "oldPassword123",
+	})
+	if err == nil {
+		t.Fatal("Expected login to fail with old password")
+	}
+
+	// Step 6: Verify new password works
+	newLoginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
+		Email:    "reset-flow@example.com",
+		Password: "newPassword123",
+	})
+	if err != nil {
+		t.Fatalf("Login with new password failed: %v", err)
+	}
+
+	if newLoginResp.SessionToken == "" {
+		t.Fatal("Expected session token from new login")
+	}
+
+	// Step 7: Verify OTP is soft-deleted after reset
+	_, err = otpRepo.GetByOTPHash(testdb.Ctx, forgotOTPHash, domain.OTPPurposeResetPassword)
+	if err == nil {
+		t.Fatal("Expected OTP to be soft-deleted after reset")
+	}
+
+	t.Log("Complete forgot and reset password flow successful")
+}
+
+// TestLogoutInvalidToken tests logout with an invalid token
 // TestLogoutInvalidToken tests logout with an invalid token
 func TestLogoutInvalidToken(t *testing.T) {
 	testdb := CreateTestDB(t)

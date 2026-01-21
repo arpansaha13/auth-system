@@ -22,6 +22,8 @@ type MockAuthService struct {
 	ValidateSessionFunc func(ctx context.Context, req service.ValidateSessionRequest) (*service.ValidateSessionResponse, error)
 	RefreshSessionFunc  func(ctx context.Context, req service.RefreshSessionRequest) (*service.RefreshSessionResponse, error)
 	LogoutFunc          func(ctx context.Context, req service.LogoutRequest) (*service.LogoutResponse, error)
+	ForgotPasswordFunc  func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error)
+	ResetPasswordFunc   func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error)
 	GetUserFunc         func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
 	GetUserByEmailFunc  func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error)
 	DeleteUserFunc      func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error)
@@ -67,6 +69,20 @@ func (m *MockAuthService) Logout(ctx context.Context, req service.LogoutRequest)
 		return m.LogoutFunc(ctx, req)
 	}
 	return &service.LogoutResponse{Message: "logout successful"}, nil
+}
+
+func (m *MockAuthService) ForgotPassword(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
+	if m.ForgotPasswordFunc != nil {
+		return m.ForgotPasswordFunc(ctx, req)
+	}
+	return &service.ForgotPasswordResponse{Message: "if email exists, reset link will be sent", OTPHash: "test-hash"}, nil
+}
+
+func (m *MockAuthService) ResetPassword(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
+	if m.ResetPasswordFunc != nil {
+		return m.ResetPasswordFunc(ctx, req)
+	}
+	return &service.ResetPasswordResponse{Message: "password reset successfully"}, nil
 }
 
 func (m *MockAuthService) GetUser(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
@@ -386,6 +402,166 @@ func TestSignupErrorHandling(t *testing.T) {
 			require.Error(t, err)
 			assert.Equal(t, tc.ExpectedCode, status.Code(err))
 			assert.Nil(t, resp)
+		})
+	}
+}
+
+// TestForgotPasswordValidation tests request validation for ForgotPassword endpoint
+func TestForgotPasswordValidation(t *testing.T) {
+	type TestCaseData struct {
+		Name          string
+		Request       *pb.ForgotPasswordRequest
+		ServiceError  error
+		ExpectedCode  codes.Code
+		ExpectedError bool
+	}
+
+	testCases := []TestCaseData{
+		{
+			Name: "Valid forgot password request",
+			Request: &pb.ForgotPasswordRequest{
+				Email: "user@example.com",
+			},
+			ServiceError:  nil,
+			ExpectedError: false,
+		},
+		{
+			Name: "Empty email",
+			Request: &pb.ForgotPasswordRequest{
+				Email: "",
+			},
+			ServiceError:  &domain.ValidationError{Message: "invalid email format", Field: "email"},
+			ExpectedCode:  codes.InvalidArgument,
+			ExpectedError: true,
+		},
+		{
+			Name: "Invalid email format",
+			Request: &pb.ForgotPasswordRequest{
+				Email: "invalid-email",
+			},
+			ServiceError:  &domain.ValidationError{Message: "invalid email format", Field: "email"},
+			ExpectedCode:  codes.InvalidArgument,
+			ExpectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthService{
+				ForgotPasswordFunc: func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
+					return &service.ForgotPasswordResponse{
+						Message: "if email exists, reset link will be sent",
+						OTPHash: "test-hash",
+					}, tc.ServiceError
+				},
+			}
+
+			controller := NewAuthServiceImpl(mockService)
+			resp, err := controller.ForgotPassword(context.Background(), tc.Request)
+
+			if tc.ExpectedError {
+				require.Error(t, err)
+				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.Nil(t, resp)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, resp)
+			}
+		})
+	}
+}
+
+// TestResetPasswordValidation tests request validation for ResetPassword endpoint
+func TestResetPasswordValidation(t *testing.T) {
+	type TestCaseData struct {
+		Name          string
+		Request       *pb.ResetPasswordRequest
+		ServiceError  error
+		ExpectedCode  codes.Code
+		ExpectedError bool
+	}
+
+	testCases := []TestCaseData{
+		{
+			Name: "Valid reset password request",
+			Request: &pb.ResetPasswordRequest{
+				OtpHash:  "test-hash",
+				Code:     "123456",
+				Password: "newPassword123",
+			},
+			ServiceError:  nil,
+			ExpectedError: false,
+		},
+		{
+			Name: "Empty OTP hash",
+			Request: &pb.ResetPasswordRequest{
+				OtpHash:  "",
+				Code:     "123456",
+				Password: "newPassword123",
+			},
+			ServiceError:  &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"},
+			ExpectedCode:  codes.InvalidArgument,
+			ExpectedError: true,
+		},
+		{
+			Name: "Invalid OTP code format",
+			Request: &pb.ResetPasswordRequest{
+				OtpHash:  "test-hash",
+				Code:     "12345", // Too short
+				Password: "newPassword123",
+			},
+			ServiceError:  &domain.ValidationError{Message: "invalid otp format", Field: "code"},
+			ExpectedCode:  codes.InvalidArgument,
+			ExpectedError: true,
+		},
+		{
+			Name: "Password too short",
+			Request: &pb.ResetPasswordRequest{
+				OtpHash:  "test-hash",
+				Code:     "123456",
+				Password: "short", // Less than 8 characters
+			},
+			ServiceError:  &domain.ValidationError{Message: "password must be at least 8 characters", Field: "password"},
+			ExpectedCode:  codes.InvalidArgument,
+			ExpectedError: true,
+		},
+		{
+			Name: "Unauthorized - invalid OTP",
+			Request: &pb.ResetPasswordRequest{
+				OtpHash:  "invalid-hash",
+				Code:     "123456",
+				Password: "newPassword123",
+			},
+			ServiceError:  &domain.UnauthorizedError{Message: "invalid otp code"},
+			ExpectedCode:  codes.Unauthenticated,
+			ExpectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthService{
+				ResetPasswordFunc: func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
+					if tc.ServiceError != nil {
+						return nil, tc.ServiceError
+					}
+					return &service.ResetPasswordResponse{
+						Message: "password reset successfully",
+					}, nil
+				},
+			}
+
+			controller := NewAuthServiceImpl(mockService)
+			resp, err := controller.ResetPassword(context.Background(), tc.Request)
+
+			if tc.ExpectedError {
+				require.Error(t, err)
+				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.Nil(t, resp)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, resp)
+			}
 		})
 	}
 }

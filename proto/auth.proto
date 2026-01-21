@@ -6,7 +6,7 @@ option go_package = "./pb";
 import "google/protobuf/timestamp.proto";
 
 // AuthService provides authentication and session management operations.
-// It handles user registration, email verification, login, session validation, and logout.
+// It handles user registration, email verification, login, session validation, logout, and password reset.
 service AuthService {
     // Signup registers a new user with email and password.
     // Returns user_id and sends verification OTP to email.
@@ -34,6 +34,14 @@ service AuthService {
     // Token is extracted from request metadata (Authorization header).
     // After logout, token becomes invalid.
     rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+    // ForgotPassword initiates password reset by generating and sending OTP to user's email.
+    // Returns OTP hash to be used in ResetPassword.
+    rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+
+    // ResetPassword verifies OTP and resets user's password to new password.
+    // Requires OTP hash and code from ForgotPassword flow.
+    rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
 
     // GetUser retrieves user information by user_id.
     // Used by other microservices to fetch user details.
@@ -111,6 +119,29 @@ message LogoutRequest {}
 // LogoutResponse returns confirmation of logout.
 message LogoutResponse {
     string message = 1; // Confirmation message ("logout successful")
+}
+
+// ForgotPasswordRequest contains email for password reset initiation.
+message ForgotPasswordRequest {
+    string email = 1; // User's email address
+}
+
+// ForgotPasswordResponse returns OTP hash for password reset.
+message ForgotPasswordResponse {
+    string message = 1; // Confirmation message
+    string otp_hash = 2; // Unique OTP hash to be used in ResetPassword
+}
+
+// ResetPasswordRequest contains OTP hash, code, and new password.
+message ResetPasswordRequest {
+    string otp_hash = 1; // OTP hash received from ForgotPassword
+    string code = 2; // 6-digit OTP code sent to email
+    string password = 3; // New password (minimum 8 characters)
+}
+
+// ResetPasswordResponse returns confirmation of password reset.
+message ResetPasswordResponse {
+    string message = 1; // Confirmation message ("password reset successfully")
 }
 
 // GetUserRequest contains user_id for user retrieval.

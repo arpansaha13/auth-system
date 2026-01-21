@@ -131,7 +131,7 @@ func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupRes
 		UserID:     newUser.ID,
 		OTPHash:    otpHash,
 		HashedCode: hashedCode,
-		Purpose:    1, // 1 = email verification after signup
+		Purpose:    domain.OTPPurposeSignupVerification,
 		ExpiresAt:  time.Now().Add(s.config.OTPExpiry),
 	}
 
@@ -182,8 +182,8 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 		return nil, &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"}
 	}
 
-	// Get OTP by hash
-	otpRecord, err := s.otpRepo.GetByOTPHash(ctx, req.OTPHash)
+	// Get OTP by hash and purpose (signup verification)
+	otpRecord, err := s.otpRepo.GetByOTPHash(ctx, req.OTPHash, domain.OTPPurposeSignupVerification)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +223,8 @@ func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*Ver
 		return nil, &domain.InternalError{Message: "failed to update user", Err: err}
 	}
 
-	// Delete OTP by hash
-	if err := s.otpRepo.SoftDeleteByOTPHash(ctx, req.OTPHash); err != nil {
+	// Delete OTP by hash and purpose
+	if err := s.otpRepo.SoftDeleteByOTPHash(ctx, req.OTPHash, domain.OTPPurposeSignupVerification); err != nil {
 		return nil, &domain.InternalError{Message: "failed to clean up otp", Err: err}
 	}
 
@@ -438,6 +438,156 @@ func (s *AuthService) Logout(ctx context.Context, req LogoutRequest) (*LogoutRes
 
 	return &LogoutResponse{
 		Message: "logout successful",
+	}, nil
+}
+
+// ForgotPasswordRequest represents forgot password input with email
+type ForgotPasswordRequest struct {
+	Email string // User's email address
+}
+
+// ForgotPasswordResponse represents forgot password output with OTP hash
+type ForgotPasswordResponse struct {
+	Message string // Confirmation message
+	OTPHash string // Unique OTP hash to be sent back during reset
+}
+
+// ForgotPassword initiates password reset by generating and sending OTP to user's email.
+// Similar to Signup but uses purpose=2 to distinguish from email verification OTPs.
+// OTP expires in 10 minutes.
+// Returns error if email doesn't exist or database operations fail.
+func (s *AuthService) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
+	// Validate input
+	if err := s.validator.ValidateEmail(req.Email); err != nil {
+		return nil, &domain.ValidationError{Message: "invalid email format", Field: "email"}
+	}
+
+	// Get user by email
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			// Return generic message to avoid email enumeration
+			return &ForgotPasswordResponse{
+				Message: "if email exists, reset link will be sent",
+				OTPHash: "",
+			}, nil
+		}
+		return nil, err
+	}
+
+	// Generate OTP code
+	otp, err := utils.GenerateOTP(s.config.OTPLength)
+	if err != nil {
+		return nil, &domain.InternalError{Message: "failed to generate otp", Err: err}
+	}
+
+	// Generate random hash for OTP identification
+	otpHash, err := utils.GenerateToken(32)
+	if err != nil {
+		return nil, &domain.InternalError{Message: "failed to generate otp hash", Err: err}
+	}
+
+	// Hash the OTP code for verification
+	hashedCode, err := s.hasher.Hash(otp)
+	if err != nil {
+		return nil, &domain.InternalError{Message: "failed to process otp", Err: err}
+	}
+
+	// Soft delete any existing forgot password OTP for this user
+	_ = s.otpRepo.SoftDeleteByUserIDAndPurpose(ctx, user.ID, domain.OTPPurposeResetPassword)
+
+	// Create new OTP record with purpose=forgot password
+	otpRecord := &domain.OTP{
+		UserID:     user.ID,
+		OTPHash:    otpHash,
+		HashedCode: hashedCode,
+		Purpose:    domain.OTPPurposeResetPassword,
+		ExpiresAt:  time.Now().Add(s.config.OTPExpiry),
+	}
+
+	if err := s.otpRepo.Create(ctx, otpRecord); err != nil {
+		return nil, &domain.InternalError{Message: "failed to store otp", Err: err}
+	}
+
+	// Enqueue email task with OTP details
+	emailBody := fmt.Sprintf("Your password reset OTP is: %s\n\nThis code expires in 10 minutes.", otp)
+	s.config.EmailPool.Enqueue(worker.EmailTask{
+		Recipient: req.Email,
+		Subject:   "Reset Your Password",
+		Body:      emailBody,
+	})
+
+	return &ForgotPasswordResponse{
+		Message: "if email exists, reset link will be sent",
+		OTPHash: otpHash,
+	}, nil
+}
+
+// ResetPasswordRequest represents password reset input
+type ResetPasswordRequest struct {
+	OTPHash  string // OTP hash received from forgot password
+	Code     string // OTP code sent to email
+	Password string // New password
+}
+
+// ResetPasswordResponse represents password reset output
+type ResetPasswordResponse struct {
+	Message string // Confirmation message
+}
+
+// ResetPassword verifies the OTP and resets the user's password.
+// User must provide the OTP hash and code from the forgot password flow.
+// Returns error if OTP is invalid, expired, or password update fails.
+func (s *AuthService) ResetPassword(ctx context.Context, req ResetPasswordRequest) (*ResetPasswordResponse, error) {
+	// Validate input
+	if err := s.validator.ValidateOTPCode(req.Code, s.config.OTPLength); err != nil {
+		return nil, &domain.ValidationError{Message: "invalid otp format", Field: "code"}
+	}
+
+	if req.OTPHash == "" {
+		return nil, &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"}
+	}
+
+	if err := s.validator.ValidatePassword(req.Password); err != nil {
+		return nil, &domain.ValidationError{Message: "password must be at least 8 characters", Field: "password"}
+	}
+
+	// Get OTP by hash and purpose (forgot password)
+	otpRecord, err := s.otpRepo.GetByOTPHash(ctx, req.OTPHash, domain.OTPPurposeResetPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	userID := otpRecord.UserID
+
+	// Check expiry
+	if time.Now().After(otpRecord.ExpiresAt) {
+		return nil, &domain.UnauthorizedError{Message: "otp has expired"}
+	}
+
+	// Verify OTP code
+	if !s.hasher.Verify(otpRecord.HashedCode, req.Code) {
+		return nil, &domain.UnauthorizedError{Message: "invalid otp code"}
+	}
+
+	// Hash new password
+	newPasswordHash, err := s.hasher.Hash(req.Password)
+	if err != nil {
+		return nil, &domain.InternalError{Message: "failed to process password", Err: err}
+	}
+
+	// Update password in transaction
+	if err := s.userRepo.UpdatePassword(ctx, userID, newPasswordHash); err != nil {
+		return nil, &domain.InternalError{Message: "failed to reset password", Err: err}
+	}
+
+	// Soft delete the OTP
+	if err := s.otpRepo.SoftDeleteByOTPHash(ctx, req.OTPHash, domain.OTPPurposeResetPassword); err != nil {
+		return nil, &domain.InternalError{Message: "failed to clean up otp", Err: err}
+	}
+
+	return &ResetPasswordResponse{
+		Message: "password reset successfully",
 	}, nil
 }
 

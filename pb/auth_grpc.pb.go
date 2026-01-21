@@ -25,6 +25,8 @@ const (
 	AuthService_ValidateSession_FullMethodName = "/proto.AuthService/ValidateSession"
 	AuthService_RefreshSession_FullMethodName  = "/proto.AuthService/RefreshSession"
 	AuthService_Logout_FullMethodName          = "/proto.AuthService/Logout"
+	AuthService_ForgotPassword_FullMethodName  = "/proto.AuthService/ForgotPassword"
+	AuthService_ResetPassword_FullMethodName   = "/proto.AuthService/ResetPassword"
 	AuthService_GetUser_FullMethodName         = "/proto.AuthService/GetUser"
 	AuthService_GetUserByEmail_FullMethodName  = "/proto.AuthService/GetUserByEmail"
 	AuthService_DeleteUser_FullMethodName      = "/proto.AuthService/DeleteUser"
@@ -35,7 +37,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // AuthService provides authentication and session management operations.
-// It handles user registration, email verification, login, session validation, and logout.
+// It handles user registration, email verification, login, session validation, logout, and password reset.
 type AuthServiceClient interface {
 	// Signup registers a new user with email and password.
 	// Returns user_id and sends verification OTP to email.
@@ -58,6 +60,12 @@ type AuthServiceClient interface {
 	// Token is extracted from request metadata (Authorization header).
 	// After logout, token becomes invalid.
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
+	// ForgotPassword initiates password reset by generating and sending OTP to user's email.
+	// Returns OTP hash to be used in ResetPassword.
+	ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error)
+	// ResetPassword verifies OTP and resets user's password to new password.
+	// Requires OTP hash and code from ForgotPassword flow.
+	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 	// GetUser retrieves user information by user_id.
 	// Used by other microservices to fetch user details.
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
@@ -137,6 +145,26 @@ func (c *authServiceClient) Logout(ctx context.Context, in *LogoutRequest, opts 
 	return out, nil
 }
 
+func (c *authServiceClient) ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ForgotPasswordResponse)
+	err := c.cc.Invoke(ctx, AuthService_ForgotPassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetPasswordResponse)
+	err := c.cc.Invoke(ctx, AuthService_ResetPassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetUserResponse)
@@ -172,7 +200,7 @@ func (c *authServiceClient) DeleteUser(ctx context.Context, in *DeleteUserReques
 // for forward compatibility.
 //
 // AuthService provides authentication and session management operations.
-// It handles user registration, email verification, login, session validation, and logout.
+// It handles user registration, email verification, login, session validation, logout, and password reset.
 type AuthServiceServer interface {
 	// Signup registers a new user with email and password.
 	// Returns user_id and sends verification OTP to email.
@@ -195,6 +223,12 @@ type AuthServiceServer interface {
 	// Token is extracted from request metadata (Authorization header).
 	// After logout, token becomes invalid.
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
+	// ForgotPassword initiates password reset by generating and sending OTP to user's email.
+	// Returns OTP hash to be used in ResetPassword.
+	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
+	// ResetPassword verifies OTP and resets user's password to new password.
+	// Requires OTP hash and code from ForgotPassword flow.
+	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	// GetUser retrieves user information by user_id.
 	// Used by other microservices to fetch user details.
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
@@ -231,6 +265,12 @@ func (UnimplementedAuthServiceServer) RefreshSession(context.Context, *RefreshSe
 }
 func (UnimplementedAuthServiceServer) Logout(context.Context, *LogoutRequest) (*LogoutResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Logout not implemented")
+}
+func (UnimplementedAuthServiceServer) ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ForgotPassword not implemented")
+}
+func (UnimplementedAuthServiceServer) ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetPassword not implemented")
 }
 func (UnimplementedAuthServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
@@ -370,6 +410,42 @@ func _AuthService_Logout_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ForgotPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForgotPasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ForgotPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ForgotPassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ForgotPassword(ctx, req.(*ForgotPasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ResetPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetPasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ResetPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ResetPassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ResetPassword(ctx, req.(*ResetPasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_GetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetUserRequest)
 	if err := dec(in); err != nil {
@@ -454,6 +530,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Logout",
 			Handler:    _AuthService_Logout_Handler,
+		},
+		{
+			MethodName: "ForgotPassword",
+			Handler:    _AuthService_ForgotPassword_Handler,
+		},
+		{
+			MethodName: "ResetPassword",
+			Handler:    _AuthService_ResetPassword_Handler,
 		},
 		{
 			MethodName: "GetUser",

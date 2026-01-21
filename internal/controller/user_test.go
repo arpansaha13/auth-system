@@ -46,6 +46,14 @@ func (m *MockAuthServiceForUser) Logout(ctx context.Context, req service.LogoutR
 	return nil, nil
 }
 
+func (m *MockAuthServiceForUser) ForgotPassword(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
+	return nil, nil
+}
+
+func (m *MockAuthServiceForUser) ResetPassword(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
+	return nil, nil
+}
+
 func (m *MockAuthServiceForUser) GetUser(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
 	if m.GetUserFunc != nil {
 		return m.GetUserFunc(ctx, req)

@@ -40,13 +40,21 @@ func (Credentials) TableName() string {
 	return "credentials"
 }
 
+// OTPPurpose defines the purpose of an OTP code
+type OTPPurpose int16
+
+const (
+	OTPPurposeSignupVerification OTPPurpose = 1 // For email verification during signup
+	OTPPurposeResetPassword      OTPPurpose = 2 // For password reset
+)
+
 // OTP represents the otps table (one-to-one)
 type OTP struct {
 	ID         int64      `gorm:"primaryKey;autoIncrement"`
 	UserID     int64      `gorm:"not null;index"`
 	OTPHash    string     `gorm:"type:varchar(255);uniqueIndex;not null"`
 	HashedCode string     `gorm:"type:varchar(255);not null"`
-	Purpose    int16      `gorm:"not null;default:1;index"`
+	Purpose    OTPPurpose `gorm:"not null;default:1;index"`
 	ExpiresAt  time.Time  `gorm:"not null"`
 	DeletedAt  *time.Time `gorm:"type:timestamp with time zone" json:"deleted_at,omitempty"` // Soft delete
 	CreatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP"`

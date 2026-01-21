@@ -119,7 +119,7 @@ func TestVerifyOTP(t *testing.T) {
 					Where("otp_hash = ?", otpHash).
 					Update("hashed_code", hashedOTP)
 
-				otp, _ := otpRepo.GetByOTPHash(testdb.Ctx, otpHash)
+				otp, _ := otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeSignupVerification)
 
 				return &SetupReturn{
 					OTPHash: otpHash,
@@ -352,6 +352,219 @@ func TestLogin(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("Login failed: %v", err)
+			}
+
+			if tc.Validate != nil {
+				tc.Validate(t, resp, setupData)
+			}
+		})
+	}
+}
+
+// TestForgotPassword tests the ForgotPassword endpoint
+func TestForgotPassword(t *testing.T) {
+	type SetupReturn struct {
+		Email string
+	}
+
+	testCases := []TestCase[*service.ForgotPasswordRequest, *service.ForgotPasswordResponse, *SetupReturn]{
+		{
+			Name: "Successful forgot password request",
+			Setup: func(t *testing.T) *SetupReturn {
+				testdb := CreateTestDB(t)
+				authService := testdb.CreateAuthService()
+
+				// Create and verify a user first
+				authService.Signup(testdb.Ctx, service.SignupRequest{
+					Email:    "forgot@example.com",
+					Password: "securePassword123",
+				})
+
+				return &SetupReturn{
+					Email: "forgot@example.com",
+				}
+			},
+			GetRequest: func(setupData *SetupReturn) *service.ForgotPasswordRequest {
+				return &service.ForgotPasswordRequest{
+					Email: setupData.Email,
+				}
+			},
+			Validate: func(t *testing.T, resp *service.ForgotPasswordResponse, setupData *SetupReturn) {
+				if resp.Message == "" {
+					t.Fatal("Expected message in response")
+				}
+				if resp.OTPHash == "" {
+					t.Fatal("Expected OTP hash in response")
+				}
+			},
+		},
+		{
+			Name: "Forgot password with non-existent email",
+			Setup: func(t *testing.T) *SetupReturn {
+				return &SetupReturn{
+					Email: "nonexistent@example.com",
+				}
+			},
+			GetRequest: func(setupData *SetupReturn) *service.ForgotPasswordRequest {
+				return &service.ForgotPasswordRequest{
+					Email: setupData.Email,
+				}
+			},
+			Validate: func(t *testing.T, resp *service.ForgotPasswordResponse, setupData *SetupReturn) {
+				// Should return generic message to avoid email enumeration
+				if resp.Message == "" {
+					t.Fatal("Expected message in response")
+				}
+			},
+		},
+	}
+
+	testdb := CreateTestDB(t)
+	authService := testdb.CreateAuthService()
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			setupData := tc.Setup(t)
+			resp, err := authService.ForgotPassword(testdb.Ctx, *tc.GetRequest(setupData))
+
+			if tc.ExpectError {
+				if err == nil {
+					t.Fatal("Expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ForgotPassword failed: %v", err)
+			}
+
+			if tc.Validate != nil {
+				tc.Validate(t, resp, setupData)
+			}
+		})
+	}
+}
+
+// TestResetPassword tests the ResetPassword endpoint
+func TestResetPassword(t *testing.T) {
+	type SetupReturn struct {
+		OTPHash string
+		UserID  int64
+		Email   string
+	}
+
+	testCases := []TestCase[*service.ResetPasswordRequest, *service.ResetPasswordResponse, *SetupReturn]{
+		{
+			Name: "Successful password reset",
+			Setup: func(t *testing.T) *SetupReturn {
+				testdb := CreateTestDB(t)
+				authService := testdb.CreateAuthService()
+				otpRepo := repository.NewOTPRepository(testdb.DB)
+
+				// Create a user
+				authService.Signup(testdb.Ctx, service.SignupRequest{
+					Email:    "reset@example.com",
+					Password: "oldPassword123",
+				})
+
+				// Initiate forgot password
+				forgotResp, _ := authService.ForgotPassword(testdb.Ctx, service.ForgotPasswordRequest{
+					Email: "reset@example.com",
+				})
+
+				otpHash := forgotResp.OTPHash
+				testOTP := "123456"
+				hasher := utils.NewPasswordHasher()
+				hashedOTP, _ := hasher.Hash(testOTP)
+
+				// Update OTP with test code
+				testdb.DB.Model(&domain.OTP{}).
+					Where("otp_hash = ? AND purpose = ?", otpHash, domain.OTPPurposeResetPassword).
+					Update("hashed_code", hashedOTP)
+
+				otp, _ := otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeResetPassword)
+				return &SetupReturn{
+					OTPHash: otpHash,
+					UserID:  otp.UserID,
+					Email:   "reset@example.com",
+				}
+			},
+			GetRequest: func(setupData *SetupReturn) *service.ResetPasswordRequest {
+				return &service.ResetPasswordRequest{
+					OTPHash:  setupData.OTPHash,
+					Code:     "123456",
+					Password: "newPassword123",
+				}
+			},
+			Validate: func(t *testing.T, resp *service.ResetPasswordResponse, setupData *SetupReturn) {
+				if resp.Message == "" {
+					t.Fatal("Expected confirmation message")
+				}
+			},
+		},
+		{
+			Name: "Reset password with invalid OTP code",
+			Setup: func(t *testing.T) *SetupReturn {
+				testdb := CreateTestDB(t)
+				authService := testdb.CreateAuthService()
+				otpRepo := repository.NewOTPRepository(testdb.DB)
+
+				// Create a user
+				authService.Signup(testdb.Ctx, service.SignupRequest{
+					Email:    "reset-invalid@example.com",
+					Password: "oldPassword123",
+				})
+
+				// Initiate forgot password
+				forgotResp, _ := authService.ForgotPassword(testdb.Ctx, service.ForgotPasswordRequest{
+					Email: "reset-invalid@example.com",
+				})
+
+				otpHash := forgotResp.OTPHash
+				testOTP := "123456"
+				hasher := utils.NewPasswordHasher()
+				hashedOTP, _ := hasher.Hash(testOTP)
+
+				testdb.DB.Model(&domain.OTP{}).
+					Where("otp_hash = ? AND purpose = ?", otpHash, domain.OTPPurposeResetPassword).
+					Update("hashed_code", hashedOTP)
+
+				otp, _ := otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeResetPassword)
+				return &SetupReturn{
+					OTPHash: otpHash,
+					UserID:  otp.UserID,
+					Email:   "reset-invalid@example.com",
+				}
+			},
+			GetRequest: func(setupData *SetupReturn) *service.ResetPasswordRequest {
+				return &service.ResetPasswordRequest{
+					OTPHash:  setupData.OTPHash,
+					Code:     "654321", // Wrong code
+					Password: "newPassword123",
+				}
+			},
+			ExpectError: true,
+			ErrorType:   "unauthorized",
+		},
+	}
+
+	testdb := CreateTestDB(t)
+	authService := testdb.CreateAuthService()
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			setupData := tc.Setup(t)
+			resp, err := authService.ResetPassword(testdb.Ctx, *tc.GetRequest(setupData))
+
+			if tc.ExpectError {
+				if err == nil {
+					t.Fatal("Expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ResetPassword failed: %v", err)
 			}
 
 			if tc.Validate != nil {
