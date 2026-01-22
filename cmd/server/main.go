@@ -107,6 +107,7 @@ func main() {
 	// Initialize gRPC server
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.ChainUnaryInterceptors(
+			middleware.ErrorInterceptor(),
 			middleware.RecoveryInterceptor(),
 			middleware.LoggingInterceptor(),
 			middleware.AuthorizationInterceptor(),

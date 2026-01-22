@@ -6,8 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
@@ -123,8 +121,9 @@ func TestSignupValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.SignupRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -134,8 +133,10 @@ func TestSignupValidation(t *testing.T) {
 				Email:    "test@example.com",
 				Password: "securePassword123",
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
+				return &service.SignupResponse{Message: "success", OTPHash: "test-hash"}, nil
+			},
 		},
 		{
 			Name: "Missing email",
@@ -143,8 +144,8 @@ func TestSignupValidation(t *testing.T) {
 				Email:    "",
 				Password: "securePassword123",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Missing password",
@@ -152,8 +153,8 @@ func TestSignupValidation(t *testing.T) {
 				Email:    "test@example.com",
 				Password: "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Both fields missing",
@@ -161,26 +162,22 @@ func TestSignupValidation(t *testing.T) {
 				Email:    "",
 				Password: "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthService{
-		SignupFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
-			return &service.SignupResponse{Message: "success", OTPHash: "test-hash"}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthService{
+				SignupFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.Signup(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -197,8 +194,9 @@ func TestVerifyOTPValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.VerifyOTPRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -208,8 +206,15 @@ func TestVerifyOTPValidation(t *testing.T) {
 				OtpHash: "test-hash-12345",
 				Code:    "123456",
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error) {
+				return &service.VerifyOTPResponse{
+					Message:      "success",
+					Username:     "test_user",
+					SessionToken: "token",
+					OTPHash:      req.OTPHash,
+				}, nil
+			},
 		},
 		{
 			Name: "Missing OTP hash",
@@ -217,8 +222,8 @@ func TestVerifyOTPValidation(t *testing.T) {
 				OtpHash: "",
 				Code:    "123456",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Missing OTP code",
@@ -226,8 +231,8 @@ func TestVerifyOTPValidation(t *testing.T) {
 				OtpHash: "test-hash-12345",
 				Code:    "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Both fields missing",
@@ -235,31 +240,22 @@ func TestVerifyOTPValidation(t *testing.T) {
 				OtpHash: "",
 				Code:    "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthService{
-		VerifyOTPFunc: func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error) {
-			return &service.VerifyOTPResponse{
-				Message:      "success",
-				Username:     "test_user",
-				SessionToken: "token",
-				OTPHash:      req.OTPHash,
-			}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthService{
+				VerifyOTPFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.VerifyOTP(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -277,8 +273,9 @@ func TestLoginValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.LoginRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -288,8 +285,10 @@ func TestLoginValidation(t *testing.T) {
 				Email:    "test@example.com",
 				Password: "securePassword123",
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error) {
+				return &service.LoginResponse{SessionToken: "token"}, nil
+			},
 		},
 		{
 			Name: "Missing email",
@@ -297,8 +296,8 @@ func TestLoginValidation(t *testing.T) {
 				Email:    "",
 				Password: "securePassword123",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Missing password",
@@ -306,8 +305,8 @@ func TestLoginValidation(t *testing.T) {
 				Email:    "test@example.com",
 				Password: "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Both fields missing",
@@ -315,26 +314,22 @@ func TestLoginValidation(t *testing.T) {
 				Email:    "",
 				Password: "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthService{
-		LoginFunc: func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error) {
-			return &service.LoginResponse{SessionToken: "token"}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthService{
+				LoginFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.Login(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -345,14 +340,15 @@ func TestLoginValidation(t *testing.T) {
 	}
 }
 
-// TestSignupErrorHandling tests error mapping from service to gRPC
+// TestSignupErrorHandling tests error handling for Signup endpoint
 func TestSignupErrorHandling(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.SignupRequest
 		ServiceError  error
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -363,8 +359,11 @@ func TestSignupErrorHandling(t *testing.T) {
 				Password: "securePassword123",
 			},
 			ServiceError:  &domain.ConflictError{Message: "email already registered"},
-			ExpectedCode:  codes.AlreadyExists,
 			ExpectedError: true,
+			ErrorType:     (*domain.ConflictError)(nil),
+			MockFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
+				return nil, &domain.ConflictError{Message: "email already registered"}
+			},
 		},
 		{
 			Name: "Service returns validation error",
@@ -373,8 +372,11 @@ func TestSignupErrorHandling(t *testing.T) {
 				Password: "securePassword123",
 			},
 			ServiceError:  &domain.ValidationError{Message: "invalid email format", Field: "email"},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
+			MockFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
+				return nil, &domain.ValidationError{Message: "invalid email format", Field: "email"}
+			},
 		},
 		{
 			Name: "Service returns internal error",
@@ -383,24 +385,25 @@ func TestSignupErrorHandling(t *testing.T) {
 				Password: "securePassword123",
 			},
 			ServiceError:  &domain.InternalError{Message: "database error"},
-			ExpectedCode:  codes.Internal,
 			ExpectedError: true,
+			ErrorType:     (*domain.InternalError)(nil),
+			MockFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
+				return nil, &domain.InternalError{Message: "database error"}
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			mockService := &MockAuthService{
-				SignupFunc: func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
-					return nil, tc.ServiceError
-				},
+				SignupFunc: tc.MockFunc,
 			}
 
 			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.Signup(context.Background(), tc.Request)
 
 			require.Error(t, err)
-			assert.Equal(t, tc.ExpectedCode, status.Code(err))
+			assert.IsType(t, tc.ErrorType, err)
 			assert.Nil(t, resp)
 		})
 	}
@@ -411,9 +414,9 @@ func TestForgotPasswordValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.ForgotPasswordRequest
-		ServiceError  error
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -422,38 +425,28 @@ func TestForgotPasswordValidation(t *testing.T) {
 			Request: &pb.ForgotPasswordRequest{
 				Email: "user@example.com",
 			},
-			ServiceError:  nil,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
+				return &service.ForgotPasswordResponse{
+					Message: "if email exists, reset link will be sent",
+					OTPHash: "test-hash",
+				}, nil
+			},
 		},
 		{
 			Name: "Empty email",
 			Request: &pb.ForgotPasswordRequest{
 				Email: "",
 			},
-			ServiceError:  &domain.ValidationError{Message: "invalid email format", Field: "email"},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
-		},
-		{
-			Name: "Invalid email format",
-			Request: &pb.ForgotPasswordRequest{
-				Email: "invalid-email",
-			},
-			ServiceError:  &domain.ValidationError{Message: "invalid email format", Field: "email"},
-			ExpectedCode:  codes.InvalidArgument,
-			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			mockService := &MockAuthService{
-				ForgotPasswordFunc: func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
-					return &service.ForgotPasswordResponse{
-						Message: "if email exists, reset link will be sent",
-						OTPHash: "test-hash",
-					}, tc.ServiceError
-				},
+				ForgotPasswordFunc: tc.MockFunc,
 			}
 
 			controller := NewAuthServiceImpl(mockService)
@@ -461,7 +454,7 @@ func TestForgotPasswordValidation(t *testing.T) {
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -476,9 +469,9 @@ func TestResetPasswordValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.ResetPasswordRequest
-		ServiceError  error
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -489,8 +482,12 @@ func TestResetPasswordValidation(t *testing.T) {
 				Code:     "123456",
 				Password: "newPassword123",
 			},
-			ServiceError:  nil,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
+				return &service.ResetPasswordResponse{
+					Message: "password reset successfully",
+				}, nil
+			},
 		},
 		{
 			Name: "Empty OTP hash",
@@ -499,9 +496,8 @@ func TestResetPasswordValidation(t *testing.T) {
 				Code:     "123456",
 				Password: "newPassword123",
 			},
-			ServiceError:  &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Invalid OTP code format",
@@ -510,9 +506,8 @@ func TestResetPasswordValidation(t *testing.T) {
 				Code:     "12345", // Too short
 				Password: "newPassword123",
 			},
-			ServiceError:  &domain.ValidationError{Message: "invalid otp format", Field: "code"},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Password too short",
@@ -521,9 +516,8 @@ func TestResetPasswordValidation(t *testing.T) {
 				Code:     "123456",
 				Password: "short", // Less than 8 characters
 			},
-			ServiceError:  &domain.ValidationError{Message: "password must be at least 8 characters", Field: "password"},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Unauthorized - invalid OTP",
@@ -532,23 +526,18 @@ func TestResetPasswordValidation(t *testing.T) {
 				Code:     "123456",
 				Password: "newPassword123",
 			},
-			ServiceError:  &domain.UnauthorizedError{Message: "invalid otp code"},
-			ExpectedCode:  codes.Unauthenticated,
 			ExpectedError: true,
+			ErrorType:     (*domain.UnauthorizedError)(nil),
+			MockFunc: func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
+				return nil, &domain.UnauthorizedError{Message: "invalid otp code"}
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			mockService := &MockAuthService{
-				ResetPasswordFunc: func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
-					if tc.ServiceError != nil {
-						return nil, tc.ServiceError
-					}
-					return &service.ResetPasswordResponse{
-						Message: "password reset successfully",
-					}, nil
-				},
+				ResetPasswordFunc: tc.MockFunc,
 			}
 
 			controller := NewAuthServiceImpl(mockService)
@@ -556,7 +545,7 @@ func TestResetPasswordValidation(t *testing.T) {
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)

@@ -132,6 +132,7 @@ func setupGRPCServer(db *gorm.DB) error {
 	// Create gRPC server with interceptors
 	globalGRPCServer = grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.ChainUnaryInterceptors(
+			middleware.ErrorInterceptor(),
 			middleware.RecoveryInterceptor(),
 			middleware.LoggingInterceptor(),
 			middleware.AuthorizationInterceptor(),

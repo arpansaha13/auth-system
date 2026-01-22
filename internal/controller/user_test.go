@@ -6,8 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
@@ -94,8 +92,9 @@ func TestGetUserValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.GetUserRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -104,48 +103,46 @@ func TestGetUserValidation(t *testing.T) {
 			Request: &pb.GetUserRequest{
 				UserId: 1,
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
+				return &service.GetUserResponse{
+					User: service.UserData{
+						UserID:   req.UserID,
+						Email:    "test@example.com",
+						Username: "test_user",
+					},
+				}, nil
+			},
 		},
 		{
 			Name: "User ID is zero",
 			Request: &pb.GetUserRequest{
 				UserId: 0,
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Negative user ID",
 			Request: &pb.GetUserRequest{
 				UserId: -1,
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthServiceForUser{
-		GetUserFunc: func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
-			return &service.GetUserResponse{
-				User: service.UserData{
-					UserID:   req.UserID,
-					Email:    "test@example.com",
-					Username: "test_user",
-				},
-			}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthServiceForUser{
+				GetUserFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.GetUser(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -161,8 +158,9 @@ func TestGetUserByEmailValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.GetUserByEmailRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -171,40 +169,38 @@ func TestGetUserByEmailValidation(t *testing.T) {
 			Request: &pb.GetUserByEmailRequest{
 				Email: "test@example.com",
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error) {
+				return &service.GetUserByEmailResponse{
+					User: service.UserData{
+						UserID:   1,
+						Email:    req.Email,
+						Username: "test_user",
+					},
+				}, nil
+			},
 		},
 		{
 			Name: "Missing email",
 			Request: &pb.GetUserByEmailRequest{
 				Email: "",
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthServiceForUser{
-		GetUserByEmailFunc: func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error) {
-			return &service.GetUserByEmailResponse{
-				User: service.UserData{
-					UserID:   1,
-					Email:    req.Email,
-					Username: "test_user",
-				},
-			}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthServiceForUser{
+				GetUserByEmailFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.GetUserByEmail(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -220,8 +216,9 @@ func TestDeleteUserValidation(t *testing.T) {
 	type TestCaseData struct {
 		Name          string
 		Request       *pb.DeleteUserRequest
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -230,42 +227,40 @@ func TestDeleteUserValidation(t *testing.T) {
 			Request: &pb.DeleteUserRequest{
 				UserId: 1,
 			},
-			ExpectedCode:  codes.OK,
 			ExpectedError: false,
+			MockFunc: func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error) {
+				return &service.DeleteUserResponse{Message: "user deleted successfully"}, nil
+			},
 		},
 		{
 			Name: "User ID is zero",
 			Request: &pb.DeleteUserRequest{
 				UserId: 0,
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 		{
 			Name: "Negative user ID",
 			Request: &pb.DeleteUserRequest{
 				UserId: -1,
 			},
-			ExpectedCode:  codes.InvalidArgument,
 			ExpectedError: true,
+			ErrorType:     (*domain.ValidationError)(nil),
 		},
 	}
-
-	mockService := &MockAuthServiceForUser{
-		DeleteUserFunc: func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error) {
-			return &service.DeleteUserResponse{Message: "user deleted successfully"}, nil
-		},
-	}
-
-	controller := NewAuthServiceImpl(mockService)
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			mockService := &MockAuthServiceForUser{
+				DeleteUserFunc: tc.MockFunc,
+			}
+			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.DeleteUser(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
 				require.Error(t, err)
-				assert.Equal(t, tc.ExpectedCode, status.Code(err))
+				assert.IsType(t, tc.ErrorType, err)
 				assert.Nil(t, resp)
 			} else {
 				require.NoError(t, err)
@@ -282,8 +277,9 @@ func TestGetUserErrorHandling(t *testing.T) {
 		Name          string
 		Request       *pb.GetUserRequest
 		ServiceError  error
-		ExpectedCode  codes.Code
 		ExpectedError bool
+		ErrorType     error
+		MockFunc      func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
 	}
 
 	testCases := []TestCaseData{
@@ -293,8 +289,11 @@ func TestGetUserErrorHandling(t *testing.T) {
 				UserId: 999,
 			},
 			ServiceError:  &domain.NotFoundError{Message: "user not found"},
-			ExpectedCode:  codes.NotFound,
 			ExpectedError: true,
+			ErrorType:     (*domain.NotFoundError)(nil),
+			MockFunc: func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
+				return nil, &domain.NotFoundError{Message: "user not found"}
+			},
 		},
 		{
 			Name: "Internal server error",
@@ -302,24 +301,25 @@ func TestGetUserErrorHandling(t *testing.T) {
 				UserId: 1,
 			},
 			ServiceError:  &domain.InternalError{Message: "database connection failed"},
-			ExpectedCode:  codes.Internal,
 			ExpectedError: true,
+			ErrorType:     (*domain.InternalError)(nil),
+			MockFunc: func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
+				return nil, &domain.InternalError{Message: "database connection failed"}
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			mockService := &MockAuthServiceForUser{
-				GetUserFunc: func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
-					return nil, tc.ServiceError
-				},
+				GetUserFunc: tc.MockFunc,
 			}
 
 			controller := NewAuthServiceImpl(mockService)
 			resp, err := controller.GetUser(context.Background(), tc.Request)
 
 			require.Error(t, err)
-			assert.Equal(t, tc.ExpectedCode, status.Code(err))
+			assert.IsType(t, tc.ErrorType, err)
 			assert.Nil(t, resp)
 		})
 	}

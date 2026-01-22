@@ -15,7 +15,7 @@ func (s *AuthServiceImpl) GetUser(ctx context.Context, req *pb.GetUserRequest) (
 	// Validate request
 	if err := validateGetUserRequest(req); err != nil {
 		log.Printf("get user validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -26,7 +26,7 @@ func (s *AuthServiceImpl) GetUser(ctx context.Context, req *pb.GetUserRequest) (
 	resp, err := s.authService.GetUser(ctx, serviceReq)
 	if err != nil {
 		log.Printf("get user error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.GetUserResponse{
@@ -45,7 +45,7 @@ func (s *AuthServiceImpl) GetUserByEmail(ctx context.Context, req *pb.GetUserByE
 	// Validate request
 	if err := validateGetUserByEmailRequest(req); err != nil {
 		log.Printf("get user by email validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -56,7 +56,7 @@ func (s *AuthServiceImpl) GetUserByEmail(ctx context.Context, req *pb.GetUserByE
 	resp, err := s.authService.GetUserByEmail(ctx, serviceReq)
 	if err != nil {
 		log.Printf("get user by email error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.GetUserByEmailResponse{
@@ -75,7 +75,7 @@ func (s *AuthServiceImpl) DeleteUser(ctx context.Context, req *pb.DeleteUserRequ
 	// Validate request
 	if err := validateDeleteUserRequest(req); err != nil {
 		log.Printf("delete user validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -86,7 +86,7 @@ func (s *AuthServiceImpl) DeleteUser(ctx context.Context, req *pb.DeleteUserRequ
 	resp, err := s.authService.DeleteUser(ctx, serviceReq)
 	if err != nil {
 		log.Printf("delete user error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.DeleteUserResponse{

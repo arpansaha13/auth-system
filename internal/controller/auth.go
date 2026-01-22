@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -31,7 +30,7 @@ func (s *AuthServiceImpl) Signup(ctx context.Context, req *pb.SignupRequest) (*p
 	// Validate request
 	if err := validateSignupRequest(req); err != nil {
 		log.Printf("signup validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -43,7 +42,7 @@ func (s *AuthServiceImpl) Signup(ctx context.Context, req *pb.SignupRequest) (*p
 	resp, err := s.authService.Signup(ctx, serviceReq)
 	if err != nil {
 		log.Printf("signup error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.SignupResponse{
@@ -57,7 +56,7 @@ func (s *AuthServiceImpl) VerifyOTP(ctx context.Context, req *pb.VerifyOTPReques
 	// Validate request
 	if err := validateVerifyOTPRequest(req); err != nil {
 		log.Printf("verify otp validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -69,7 +68,7 @@ func (s *AuthServiceImpl) VerifyOTP(ctx context.Context, req *pb.VerifyOTPReques
 	resp, err := s.authService.VerifyOTP(ctx, serviceReq)
 	if err != nil {
 		log.Printf("verify otp error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.VerifyOTPResponse{
@@ -84,7 +83,7 @@ func (s *AuthServiceImpl) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	// Validate request
 	if err := validateLoginRequest(req); err != nil {
 		log.Printf("login validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -96,7 +95,7 @@ func (s *AuthServiceImpl) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	resp, err := s.authService.Login(ctx, serviceReq)
 	if err != nil {
 		log.Printf("login error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.LoginResponse{
@@ -121,7 +120,7 @@ func (s *AuthServiceImpl) ValidateSession(ctx context.Context, req *pb.ValidateS
 	resp, err := s.authService.ValidateSession(ctx, serviceReq)
 	if err != nil {
 		log.Printf("validate session error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.ValidateSessionResponse{
@@ -146,7 +145,7 @@ func (s *AuthServiceImpl) RefreshSession(ctx context.Context, req *pb.RefreshSes
 	resp, err := s.authService.RefreshSession(ctx, serviceReq)
 	if err != nil {
 		log.Printf("refresh session error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.RefreshSessionResponse{
@@ -170,7 +169,7 @@ func (s *AuthServiceImpl) Logout(ctx context.Context, req *pb.LogoutRequest) (*p
 	resp, err := s.authService.Logout(ctx, serviceReq)
 	if err != nil {
 		log.Printf("logout error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.LogoutResponse{
@@ -183,7 +182,7 @@ func (s *AuthServiceImpl) ForgotPassword(ctx context.Context, req *pb.ForgotPass
 	// Validate request
 	if err := validateForgotPasswordRequest(req); err != nil {
 		log.Printf("forgot password validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	// Call service
@@ -194,7 +193,7 @@ func (s *AuthServiceImpl) ForgotPassword(ctx context.Context, req *pb.ForgotPass
 	resp, err := s.authService.ForgotPassword(ctx, serviceReq)
 	if err != nil {
 		log.Printf("forgot password error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.ForgotPasswordResponse{
@@ -208,10 +207,9 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, req *pb.ResetPasswo
 	// Validate request
 	if err := validateResetPasswordRequest(req); err != nil {
 		log.Printf("reset password validation error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
-	// Call service
 	serviceReq := service.ResetPasswordRequest{
 		OTPHash:  req.OtpHash,
 		Code:     req.Code,
@@ -221,7 +219,7 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, req *pb.ResetPasswo
 	resp, err := s.authService.ResetPassword(ctx, serviceReq)
 	if err != nil {
 		log.Printf("reset password error: %v", err)
-		return nil, errorToGRPCError(err)
+		return nil, err
 	}
 
 	return &pb.ResetPasswordResponse{
@@ -289,30 +287,4 @@ func extractToken(ctx context.Context) string {
 		return ""
 	}
 	return token
-}
-
-func errorToGRPCError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	// Check error types and map to appropriate gRPC codes
-	if domain.IsValidation(err) {
-		return status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if domain.IsConflict(err) {
-		return status.Error(codes.AlreadyExists, err.Error())
-	}
-
-	if domain.IsNotFound(err) {
-		return status.Error(codes.NotFound, err.Error())
-	}
-
-	if domain.IsUnauthorized(err) {
-		return status.Error(codes.Unauthenticated, err.Error())
-	}
-
-	// Default to internal error
-	return status.Error(codes.Internal, fmt.Sprintf("internal server error: %v", err))
 }
