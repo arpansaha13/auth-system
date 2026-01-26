@@ -1,11 +1,8 @@
 package tests
 
 import (
-	"context"
 	"testing"
 	"time"
-
-	"gorm.io/gorm"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
@@ -13,12 +10,6 @@ import (
 	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/internal/worker"
 )
-
-// TestDB holds database resources for tests (deprecated, use shared global)
-type TestDB struct {
-	DB  *gorm.DB
-	Ctx context.Context
-}
 
 // CreateTestDB creates a test database connection using shared global resources
 func CreateTestDB(t *testing.T) *TestDB {
