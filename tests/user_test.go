@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -47,15 +48,11 @@ func TestGetUser(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get a valid session
 				var session domain.Session
-				if err := f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
 
 				// Get the user
 				var user domain.User
-				if err := f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
 
 				// Add token to context
 				md := metadata.Pairs("authorization", "Bearer test-token")
@@ -63,18 +60,10 @@ func TestGetUser(t *testing.T) {
 
 				resp, err := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: int64(user.ID)})
 
-				if err != nil {
-					return err
-				}
-				if resp.User == nil {
-					return &domain.ValidationError{Message: "expected user in response"}
-				}
-				if resp.User.Email != "getuser@example.com" {
-					return &domain.ValidationError{Message: "email mismatch"}
-				}
-				if !resp.User.Verified {
-					return &domain.ValidationError{Message: "expected user to be verified"}
-				}
+				require.NoError(f.T, err)
+				require.NotNil(f.T, resp.User, "expected user in response")
+				require.Equal(f.T, "getuser@example.com", resp.User.Email, "email mismatch")
+				require.True(f.T, resp.User.Verified, "expected user to be verified")
 				return nil
 			},
 			ExpectError: false,
@@ -91,13 +80,9 @@ func TestGetUser(t *testing.T) {
 				resp, err := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: 99999})
 
 				// We expect an error for non-existent user
-				if err == nil {
-					return &domain.ValidationError{Message: "expected error for non-existent user"}
-				}
+				require.Error(f.T, err, "expected error for non-existent user")
 				// If we got an error as expected, that's success
-				if resp == nil {
-					return nil
-				}
+				require.Nil(f.T, resp)
 				return nil
 			},
 			ExpectError: false,
@@ -166,18 +151,10 @@ func TestGetUserByEmail(t *testing.T) {
 
 				resp, err := f.GRPCClient.GetUserByEmail(ctxWithToken, &pb.GetUserByEmailRequest{Email: "getuserbyemail@example.com"})
 
-				if err != nil {
-					return err
-				}
-				if resp.User == nil {
-					return &domain.ValidationError{Message: "expected user in response"}
-				}
-				if resp.User.Email != "getuserbyemail@example.com" {
-					return &domain.ValidationError{Message: "email mismatch"}
-				}
-				if !resp.User.Verified {
-					return &domain.ValidationError{Message: "expected user to be verified"}
-				}
+				require.NoError(f.T, err)
+				require.NotNil(f.T, resp.User, "expected user in response")
+				require.Equal(f.T, "getuserbyemail@example.com", resp.User.Email, "email mismatch")
+				require.True(f.T, resp.User.Verified, "expected user to be verified")
 				return nil
 			},
 			ExpectError: false,
@@ -194,13 +171,9 @@ func TestGetUserByEmail(t *testing.T) {
 				resp, err := f.GRPCClient.GetUserByEmail(ctxWithToken, &pb.GetUserByEmailRequest{Email: "nonexistent@example.com"})
 
 				// We expect an error for non-existent email
-				if err == nil {
-					return &domain.ValidationError{Message: "expected error for non-existent email"}
-				}
+				require.Error(f.T, err, "expected error for non-existent email")
 				// If we got an error as expected, that's success
-				if resp == nil {
-					return nil
-				}
+				require.Nil(f.T, resp)
 				return nil
 			},
 			ExpectError: false,
@@ -266,15 +239,11 @@ func TestDeleteUser(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get a valid session
 				var session domain.Session
-				if err := f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
 
 				// Get the user
 				var user domain.User
-				if err := f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
 
 				// Add token to context
 				md := metadata.Pairs("authorization", "Bearer test-token")
@@ -282,18 +251,12 @@ func TestDeleteUser(t *testing.T) {
 
 				resp, err := f.GRPCClient.DeleteUser(ctxWithToken, &pb.DeleteUserRequest{UserId: int64(user.ID)})
 
-				if err != nil {
-					return err
-				}
-				if resp.Message == "" {
-					return &domain.ValidationError{Message: "expected message in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, resp.Message, "expected message in response")
 
 				// Verify user is actually deleted
 				_, verifyErr := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: int64(user.ID)})
-				if verifyErr == nil {
-					return &domain.ValidationError{Message: "expected error when getting deleted user"}
-				}
+				require.Error(f.T, verifyErr, "expected error when getting deleted user")
 
 				return nil
 			},

@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -25,15 +26,9 @@ func TestSignup(t *testing.T) {
 					Password: "securePassword123",
 				})
 
-				if err != nil {
-					return err
-				}
-				if resp.Message == "" {
-					return &domain.ValidationError{Message: "expected message in response"}
-				}
-				if resp.OtpHash == "" {
-					return &domain.ValidationError{Message: "expected OTP hash in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, resp.Message, "expected message in response")
+				require.NotEmpty(f.T, resp.OtpHash, "expected OTP hash in response")
 				return nil
 			},
 			ExpectError: false,
@@ -55,13 +50,9 @@ func TestSignup(t *testing.T) {
 				})
 
 				// We expect an error for duplicate email
-				if err == nil {
-					return &domain.ValidationError{Message: "expected error for duplicate email"}
-				}
+				require.Error(f.T, err, "expected error for duplicate email")
 				// If we got an error as expected, that's success
-				if resp == nil {
-					return nil
-				}
+				require.Nil(f.T, resp)
 				return nil
 			},
 			ExpectError: false,
@@ -121,25 +112,17 @@ func TestVerifyOTP(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get the OTP by looking for one with hashed code set
 				var otp domain.OTP
-				if err := f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", testEmail).
-					First(&otp).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", testEmail).
+					First(&otp).Error)
 
 				verifyResp, err := f.GRPCClient.VerifyOTP(f.Ctx, &pb.VerifyOTPRequest{
 					OtpHash: otp.OTPHash,
 					Code:    testOTPCode,
 				})
 
-				if err != nil {
-					return err
-				}
-				if verifyResp.Username == "" {
-					return &domain.ValidationError{Message: "expected username in response"}
-				}
-				if verifyResp.SessionToken == "" {
-					return &domain.ValidationError{Message: "expected session token in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, verifyResp.Username, "expected username in response")
+				require.NotEmpty(f.T, verifyResp.SessionToken, "expected session token in response")
 				return nil
 			},
 			ExpectError: false,
@@ -166,10 +149,8 @@ func TestVerifyOTP(t *testing.T) {
 			},
 			Test: func(f *TestFixture) error {
 				var otp domain.OTP
-				if err := f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "verify-wrong@example.com").
-					First(&otp).Error; err != nil {
-					return err
-				}
+				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "verify-wrong@example.com").
+					First(&otp).Error)
 
 				verifyResp, err := f.GRPCClient.VerifyOTP(f.Ctx, &pb.VerifyOTPRequest{
 					OtpHash: otp.OTPHash,
@@ -177,13 +158,9 @@ func TestVerifyOTP(t *testing.T) {
 				})
 
 				// We expect an error for incorrect code
-				if err == nil {
-					return &domain.ValidationError{Message: "expected error for incorrect OTP code"}
-				}
+				require.Error(f.T, err, "expected error for incorrect OTP code")
 				// If we got an error as expected, that's success
-				if verifyResp == nil {
-					return nil
-				}
+				require.Nil(f.T, verifyResp)
 				return nil
 			},
 			ExpectError: false,
@@ -252,15 +229,9 @@ func TestLogin(t *testing.T) {
 					Password: "securePassword123",
 				})
 
-				if err != nil {
-					return err
-				}
-				if loginResp.SessionToken == "" {
-					return &domain.ValidationError{Message: "expected session token in response"}
-				}
-				if loginResp.ExpiresAt == nil {
-					return &domain.ValidationError{Message: "expected expiration time in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, loginResp.SessionToken, "expected session token in response")
+				require.NotNil(f.T, loginResp.ExpiresAt, "expected expiration time in response")
 				return nil
 			},
 			ExpectError: false,
@@ -282,13 +253,9 @@ func TestLogin(t *testing.T) {
 				})
 
 				// We expect an error for unverified user
-				if err == nil {
-					return &domain.ValidationError{Message: "expected error for unverified user"}
-				}
+				require.Error(f.T, err, "expected error for unverified user")
 				// If we got an error as expected, that's success for this test
-				if loginResp == nil {
-					return nil
-				}
+				require.Nil(f.T, loginResp)
 				return nil
 			},
 			ExpectError: false,
@@ -356,15 +323,9 @@ func TestForgotPassword(t *testing.T) {
 					Email: "forgot@example.com",
 				})
 
-				if err != nil {
-					return err
-				}
-				if forgotResp.Message == "" {
-					return &domain.ValidationError{Message: "expected message in response"}
-				}
-				if forgotResp.OtpHash == "" {
-					return &domain.ValidationError{Message: "expected OTP hash in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, forgotResp.Message, "expected message in response")
+				require.NotEmpty(f.T, forgotResp.OtpHash, "expected OTP hash in response")
 				return nil
 			},
 			ExpectError: false,
@@ -446,11 +407,9 @@ func TestResetPassword(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get the most recent OTP (reset password OTP)
 				var otp domain.OTP
-				if err := f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "reset@example.com").
+				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "reset@example.com").
 					Order("created_at DESC").
-					First(&otp).Error; err != nil {
-					return err
-				}
+					First(&otp).Error)
 
 				resetResp, err := f.GRPCClient.ResetPassword(f.Ctx, &pb.ResetPasswordRequest{
 					OtpHash:  otp.OTPHash,
@@ -458,12 +417,8 @@ func TestResetPassword(t *testing.T) {
 					Password: "newPassword123",
 				})
 
-				if err != nil {
-					return err
-				}
-				if resetResp.Message == "" {
-					return &domain.ValidationError{Message: "expected message in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, resetResp.Message, "expected message in response")
 				return nil
 			},
 			ExpectError: false,
@@ -532,9 +487,7 @@ func TestValidateSession(t *testing.T) {
 					Email:    "validate@example.com",
 					Password: "securePassword123",
 				})
-				if err != nil {
-					return err
-				}
+				require.NoError(f.T, err)
 
 				// Create context with token metadata
 				md := metadata.Pairs("authorization", "Bearer "+loginResp.SessionToken)
@@ -542,12 +495,8 @@ func TestValidateSession(t *testing.T) {
 
 				validateResp, err := f.GRPCClient.ValidateSession(ctxWithToken, &pb.ValidateSessionRequest{})
 
-				if err != nil {
-					return err
-				}
-				if !validateResp.Valid {
-					return &domain.ValidationError{Message: "expected valid session"}
-				}
+				require.NoError(f.T, err)
+				require.True(f.T, validateResp.Valid, "expected valid session")
 				return nil
 			},
 			ExpectError: false,
@@ -616,9 +565,7 @@ func TestRefreshSession(t *testing.T) {
 					Email:    "refresh@example.com",
 					Password: "securePassword123",
 				})
-				if err != nil {
-					return err
-				}
+				require.NoError(f.T, err)
 
 				// Create context with token metadata
 				md := metadata.Pairs("authorization", "Bearer "+loginResp.SessionToken)
@@ -626,12 +573,8 @@ func TestRefreshSession(t *testing.T) {
 
 				refreshResp, err := f.GRPCClient.RefreshSession(ctxWithToken, &pb.RefreshSessionRequest{})
 
-				if err != nil {
-					return err
-				}
-				if refreshResp.NewSessionToken == "" {
-					return &domain.ValidationError{Message: "expected new token in response"}
-				}
+				require.NoError(f.T, err)
+				require.NotEmpty(f.T, refreshResp.NewSessionToken, "expected new token in response")
 				return nil
 			},
 			ExpectError: false,

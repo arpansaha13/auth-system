@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
 	"github.com/arpansaha13/auth-system/internal/service"
@@ -62,17 +64,9 @@ func TestSignupFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
-
-	if signupResp.OTPHash == "" {
-		t.Fatal("Expected OTP hash in response")
-	}
-
-	if signupResp.Message == "" {
-		t.Fatal("Expected message in response")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, signupResp.OTPHash, "Expected OTP hash in response")
+	require.NotEmpty(t, signupResp.Message, "Expected message in response")
 
 	t.Logf("Signup successful: %s, OTP Hash: %s", signupResp.Message, signupResp.OTPHash)
 }
@@ -89,9 +83,7 @@ func TestSignupDuplicate(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err != nil {
-		t.Fatalf("First signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Duplicate signup
 	_, err = authService.Signup(testdb.Ctx, service.SignupRequest{
@@ -99,13 +91,8 @@ func TestSignupDuplicate(t *testing.T) {
 		Password: "anotherPassword123",
 	})
 
-	if err == nil {
-		t.Fatal("Expected error for duplicate email")
-	}
-
-	if !domain.IsConflict(err) {
-		t.Fatalf("Expected ConflictError, got: %T", err)
-	}
+	require.Error(t, err, "Expected error for duplicate email")
+	require.True(t, domain.IsConflict(err), "Expected ConflictError")
 
 	t.Logf("Duplicate signup correctly prevented: %v", err)
 }
@@ -122,9 +109,7 @@ func TestLoginBeforeVerification(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Try to login before verification
 	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
@@ -132,13 +117,8 @@ func TestLoginBeforeVerification(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err == nil {
-		t.Fatal("Expected error when logging in before email verification")
-	}
-
-	if !domain.IsUnauthorized(err) {
-		t.Fatalf("Expected UnauthorizedError, got: %T", err)
-	}
+	require.Error(t, err, "Expected error when logging in before email verification")
+	require.True(t, domain.IsUnauthorized(err), "Expected UnauthorizedError")
 
 	t.Logf("Login correctly blocked before verification: %v", err)
 }
@@ -156,31 +136,23 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	otpHash := signupResp.OTPHash
 
-	if otpHash == "" {
-		t.Fatal("Expected OTP hash in signup response")
-	}
+	require.NotEmpty(t, otpHash, "Expected OTP hash in signup response")
 
 	// Step 2: Get OTP from database (simulate email)
 	_, err = otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeSignupVerification)
-	if err != nil {
-		t.Fatalf("Failed to get OTP: %v", err)
-	}
+	require.NoError(t, err)
 
 	// For testing, we need to update the OTP code hash
 	hasher := utils.NewPasswordHasher()
 	testOTP := "123456"
 	hash, _ := hasher.Hash(testOTP)
-	if err := testdb.DB.Model(&domain.OTP{}).
+	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
-		Update("hashed_code", hash).Error; err != nil {
-		t.Fatalf("Failed to set hash: %v", err)
-	}
+		Update("hashed_code", hash).Error)
 
 	// Step 3: Verify OTP using OTP hash from signup response
 	verifyResp, err := authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
@@ -188,17 +160,9 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Code:    testOTP,
 	})
 
-	if err != nil {
-		t.Fatalf("OTP verification failed: %v", err)
-	}
-
-	if verifyResp.SessionToken == "" {
-		t.Fatal("Expected session token in verification response")
-	}
-
-	if verifyResp.OTPHash == "" {
-		t.Fatal("Expected OTP hash in verification response")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, verifyResp.SessionToken, "Expected session token in verification response")
+	require.NotEmpty(t, verifyResp.OTPHash, "Expected OTP hash in verification response")
 
 	t.Logf("OTP verified, username: %s, OTP hash: %s", verifyResp.Username, verifyResp.OTPHash)
 
@@ -208,26 +172,16 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	if loginResp.SessionToken == "" {
-		t.Fatal("Expected session token in login response")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, loginResp.SessionToken, "Expected session token in login response")
 
 	// Step 5: Validate session
 	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
 
-	if err != nil {
-		t.Fatalf("Session validation failed: %v", err)
-	}
-
-	if !validateResp.Valid {
-		t.Fatal("Expected session to be valid")
-	}
+	require.NoError(t, err)
+	require.True(t, validateResp.Valid, "Expected session to be valid")
 
 	t.Log("Complete auth flow successful")
 }
@@ -243,9 +197,7 @@ func TestSessionRefresh(t *testing.T) {
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	otpHash := signupResp.OTPHash
 
@@ -253,28 +205,22 @@ func TestSessionRefresh(t *testing.T) {
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
 	otpHashCode, _ := hasher.Hash(testOTP)
-	if err := testdb.DB.Model(&domain.OTP{}).
+	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
-		Update("hashed_code", otpHashCode).Error; err != nil {
-		t.Fatalf("Failed to set hash: %v", err)
-	}
+		Update("hashed_code", otpHashCode).Error)
 
 	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	if err != nil {
-		t.Fatalf("OTP verification failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Login to get a valid session token
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	oldToken := loginResp.SessionToken
 
@@ -283,17 +229,9 @@ func TestSessionRefresh(t *testing.T) {
 		Token: oldToken,
 	})
 
-	if err != nil {
-		t.Fatalf("Session refresh failed: %v", err)
-	}
-
-	if refreshResp.NewSessionToken == "" {
-		t.Fatal("Expected new session token")
-	}
-
-	if refreshResp.NewSessionToken == oldToken {
-		t.Fatal("Expected different token after refresh")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, refreshResp.NewSessionToken, "Expected new session token")
+	require.NotEqual(t, oldToken, refreshResp.NewSessionToken, "Expected different token after refresh")
 
 	t.Log("Session refresh successful")
 }
@@ -309,9 +247,7 @@ func TestLogout(t *testing.T) {
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	otpHash := signupResp.OTPHash
 
@@ -319,65 +255,44 @@ func TestLogout(t *testing.T) {
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
 	otpHashCode, _ := hasher.Hash(testOTP)
-	if err := testdb.DB.Model(&domain.OTP{}).
+	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
-		Update("hashed_code", otpHashCode).Error; err != nil {
-		t.Fatalf("Failed to set hash: %v", err)
-	}
+		Update("hashed_code", otpHashCode).Error)
 
 	// Step 3: Verify OTP
 	_, err = authService.VerifyOTP(testdb.Ctx, service.VerifyOTPRequest{
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	if err != nil {
-		t.Fatalf("OTP verification failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Step 4: Login
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Step 5: Verify session is valid before logout
 	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
-	if err != nil {
-		t.Fatalf("Session validation failed: %v", err)
-	}
-
-	if !validateResp.Valid {
-		t.Fatal("Expected session to be valid before logout")
-	}
+	require.NoError(t, err)
+	require.True(t, validateResp.Valid, "Expected session to be valid before logout")
 
 	// Step 6: Logout
 	logoutResp, err := authService.Logout(testdb.Ctx, service.LogoutRequest{
 		Token: loginResp.SessionToken,
 	})
-	if err != nil {
-		t.Fatalf("Logout failed: %v", err)
-	}
-
-	if logoutResp.Message != "logout successful" {
-		t.Fatalf("Expected logout success message, got: %s", logoutResp.Message)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "logout successful", logoutResp.Message)
 
 	// Step 7: Verify session is invalid after logout
 	validateAfterLogout, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
-	if err != nil {
-		t.Fatalf("Session validation after logout failed: %v", err)
-	}
-
-	if validateAfterLogout.Valid {
-		t.Fatal("Expected session to be invalid after logout")
-	}
+	require.NoError(t, err)
+	require.False(t, validateAfterLogout.Valid, "Expected session to be invalid after logout")
 
 	t.Log("Logout successful and session invalidated")
 }
@@ -393,9 +308,7 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		Email:    "reset-flow@example.com",
 		Password: "oldPassword123",
 	})
-	if err != nil {
-		t.Fatalf("Signup failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	otpHash := signupResp.OTPHash
 
@@ -412,22 +325,16 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	if err != nil {
-		t.Fatalf("OTP verification failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Step 2: Initiate forgot password
 	forgotResp, err := authService.ForgotPassword(testdb.Ctx, service.ForgotPasswordRequest{
 		Email: "reset-flow@example.com",
 	})
-	if err != nil {
-		t.Fatalf("ForgotPassword failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	forgotOTPHash := forgotResp.OTPHash
-	if forgotOTPHash == "" {
-		t.Fatal("Expected OTP hash from forgot password")
-	}
+	require.NotEmpty(t, forgotOTPHash, "Expected OTP hash from forgot password")
 
 	// Step 3: Get the OTP and prepare for reset
 	forgotOTP := "654321" // Different OTP
@@ -442,41 +349,27 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		Code:     forgotOTP,
 		Password: "newPassword123",
 	})
-	if err != nil {
-		t.Fatalf("ResetPassword failed: %v", err)
-	}
-
-	if resetResp.Message != "password reset successfully" {
-		t.Fatalf("Expected reset success message, got: %s", resetResp.Message)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "password reset successfully", resetResp.Message)
 
 	// Step 5: Verify old password no longer works
 	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "reset-flow@example.com",
 		Password: "oldPassword123",
 	})
-	if err == nil {
-		t.Fatal("Expected login to fail with old password")
-	}
+	require.Error(t, err, "Expected login to fail with old password")
 
 	// Step 6: Verify new password works
 	newLoginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "reset-flow@example.com",
 		Password: "newPassword123",
 	})
-	if err != nil {
-		t.Fatalf("Login with new password failed: %v", err)
-	}
-
-	if newLoginResp.SessionToken == "" {
-		t.Fatal("Expected session token from new login")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, newLoginResp.SessionToken, "Expected session token from new login")
 
 	// Step 7: Verify OTP is soft-deleted after reset
 	_, err = otpRepo.GetByOTPHash(testdb.Ctx, forgotOTPHash, domain.OTPPurposeResetPassword)
-	if err == nil {
-		t.Fatal("Expected OTP to be soft-deleted after reset")
-	}
+	require.Error(t, err, "Expected OTP to be soft-deleted after reset")
 
 	t.Log("Complete forgot and reset password flow successful")
 }
@@ -493,13 +386,8 @@ func TestLogoutInvalidToken(t *testing.T) {
 		Token: "invalid-token",
 	})
 
-	if err == nil {
-		t.Fatal("Expected error for invalid token")
-	}
-
-	if !domain.IsNotFound(err) {
-		t.Fatalf("Expected NotFoundError, got: %T", err)
-	}
+	require.Error(t, err, "Expected error for invalid token")
+	require.True(t, domain.IsNotFound(err), "Expected NotFoundError")
 
 	t.Log("Invalid token logout properly rejected")
 }
@@ -515,13 +403,8 @@ func TestLogoutEmptyToken(t *testing.T) {
 		Token: "",
 	})
 
-	if err == nil {
-		t.Fatal("Expected error for empty token")
-	}
-
-	if !domain.IsUnauthorized(err) {
-		t.Fatalf("Expected UnauthorizedError, got: %T", err)
-	}
+	require.Error(t, err, "Expected error for empty token")
+	require.True(t, domain.IsUnauthorized(err), "Expected UnauthorizedError")
 
 	t.Log("Empty token logout properly rejected")
 }
