@@ -16,3 +16,6 @@ type IAuthService interface {
 	GetUserByEmail(ctx context.Context, req GetUserByEmailRequest) (*GetUserByEmailResponse, error)
 	DeleteUser(ctx context.Context, req DeleteUserRequest) (*DeleteUserResponse, error)
 }
+
+// Compile-time check to ensure AuthService implements IAuthService
+var _ IAuthService = (*AuthService)(nil)

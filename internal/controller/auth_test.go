@@ -9,6 +9,7 @@ import (
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
+	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/pb"
 )
 
@@ -116,6 +117,12 @@ func (m *MockAuthService) DeleteUser(ctx context.Context, req service.DeleteUser
 	return &service.DeleteUserResponse{Message: "user deleted successfully"}, nil
 }
 
+// newTestController creates a new AuthServiceImpl with a real validator for testing
+func newTestController(mockService service.IAuthService) *AuthServiceImpl {
+	validator := utils.NewValidator()
+	return NewAuthServiceImpl(mockService, validator)
+}
+
 // TestSignupValidation tests request validation for Signup endpoint
 func TestSignupValidation(t *testing.T) {
 	type TestCaseData struct {
@@ -172,7 +179,7 @@ func TestSignupValidation(t *testing.T) {
 			mockService := &MockAuthService{
 				SignupFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.Signup(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -250,7 +257,7 @@ func TestVerifyOTPValidation(t *testing.T) {
 			mockService := &MockAuthService{
 				VerifyOTPFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.VerifyOTP(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -324,7 +331,7 @@ func TestLoginValidation(t *testing.T) {
 			mockService := &MockAuthService{
 				LoginFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.Login(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -399,7 +406,7 @@ func TestSignupErrorHandling(t *testing.T) {
 				SignupFunc: tc.MockFunc,
 			}
 
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.Signup(context.Background(), tc.Request)
 
 			require.Error(t, err)
@@ -449,7 +456,7 @@ func TestForgotPasswordValidation(t *testing.T) {
 				ForgotPasswordFunc: tc.MockFunc,
 			}
 
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.ForgotPassword(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -540,7 +547,7 @@ func TestResetPasswordValidation(t *testing.T) {
 				ResetPasswordFunc: tc.MockFunc,
 			}
 
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.ResetPassword(context.Background(), tc.Request)
 
 			if tc.ExpectedError {

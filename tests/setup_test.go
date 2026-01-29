@@ -153,7 +153,6 @@ func setupGRPCServer(db *gorm.DB) error {
 		otpRepo,
 		sessionRepo,
 		hasher,
-		validator,
 		service.AuthServiceConfig{
 			OTPExpiry:  10 * time.Minute,
 			OTPLength:  6,
@@ -163,7 +162,7 @@ func setupGRPCServer(db *gorm.DB) error {
 		},
 	)
 
-	authServiceImpl := controller.NewAuthServiceImpl(authService)
+	authServiceImpl := controller.NewAuthServiceImpl(authService, validator)
 	pb.RegisterAuthServiceServer(globalGRPCServer, authServiceImpl)
 
 	// Start server in goroutine

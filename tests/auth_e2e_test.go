@@ -30,7 +30,6 @@ func (tdb *TestDB) CreateAuthService() *service.AuthService {
 	otpRepo := repository.NewOTPRepository(tdb.DB)
 	sessionRepo := repository.NewSessionRepository(tdb.DB)
 	hasher := utils.NewPasswordHasher()
-	validator := utils.NewValidator()
 	emailProvider := worker.NewMockEmailProvider()
 
 	// Create email worker pool with 2 workers for testing
@@ -41,7 +40,6 @@ func (tdb *TestDB) CreateAuthService() *service.AuthService {
 		otpRepo,
 		sessionRepo,
 		hasher,
-		validator,
 		service.AuthServiceConfig{
 			OTPExpiry:  10 * time.Minute,
 			OTPLength:  6,

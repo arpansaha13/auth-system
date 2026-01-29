@@ -23,6 +23,7 @@
     "repos",
     "signup",
     "sslmode",
+    "stretchr",
     "testcontainers",
     "unary",
     "uuid",

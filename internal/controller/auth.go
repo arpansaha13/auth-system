@@ -6,6 +6,7 @@ import (
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
+	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,19 +17,21 @@ import (
 type AuthServiceImpl struct {
 	pb.UnimplementedAuthServiceServer
 	authService service.IAuthService
+	validator   *utils.Validator
 }
 
 // NewAuthServiceImpl creates a new auth service implementation
-func NewAuthServiceImpl(authService service.IAuthService) *AuthServiceImpl {
+func NewAuthServiceImpl(authService service.IAuthService, validator *utils.Validator) *AuthServiceImpl {
 	return &AuthServiceImpl{
 		authService: authService,
+		validator:   validator,
 	}
 }
 
 // Signup handles user registration
 func (s *AuthServiceImpl) Signup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
 	// Validate request
-	if err := validateSignupRequest(req); err != nil {
+	if err := s.validateSignupRequest(req); err != nil {
 		log.Printf("signup validation error: %v", err)
 		return nil, err
 	}
@@ -54,7 +57,7 @@ func (s *AuthServiceImpl) Signup(ctx context.Context, req *pb.SignupRequest) (*p
 // VerifyOTP verifies an OTP and marks user as verified
 func (s *AuthServiceImpl) VerifyOTP(ctx context.Context, req *pb.VerifyOTPRequest) (*pb.VerifyOTPResponse, error) {
 	// Validate request
-	if err := validateVerifyOTPRequest(req); err != nil {
+	if err := s.validateVerifyOTPRequest(req); err != nil {
 		log.Printf("verify otp validation error: %v", err)
 		return nil, err
 	}
@@ -81,7 +84,7 @@ func (s *AuthServiceImpl) VerifyOTP(ctx context.Context, req *pb.VerifyOTPReques
 // Login authenticates a user
 func (s *AuthServiceImpl) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	// Validate request
-	if err := validateLoginRequest(req); err != nil {
+	if err := s.validateLoginRequest(req); err != nil {
 		log.Printf("login validation error: %v", err)
 		return nil, err
 	}
@@ -180,7 +183,7 @@ func (s *AuthServiceImpl) Logout(ctx context.Context, req *pb.LogoutRequest) (*p
 // ForgotPassword initiates password reset by sending OTP to email
 func (s *AuthServiceImpl) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
 	// Validate request
-	if err := validateForgotPasswordRequest(req); err != nil {
+	if err := s.validateForgotPasswordRequest(req); err != nil {
 		log.Printf("forgot password validation error: %v", err)
 		return nil, err
 	}
@@ -205,7 +208,7 @@ func (s *AuthServiceImpl) ForgotPassword(ctx context.Context, req *pb.ForgotPass
 // ResetPassword verifies OTP and resets user's password
 func (s *AuthServiceImpl) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
 	// Validate request
-	if err := validateResetPasswordRequest(req); err != nil {
+	if err := s.validateResetPasswordRequest(req); err != nil {
 		log.Printf("reset password validation error: %v", err)
 		return nil, err
 	}
@@ -227,19 +230,25 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, req *pb.ResetPasswo
 	}, nil
 }
 
-// Private helper and validation functions
+// Private helper and validation methods
 
-func validateSignupRequest(req *pb.SignupRequest) error {
+func (s *AuthServiceImpl) validateSignupRequest(req *pb.SignupRequest) error {
 	if req.Email == "" {
 		return &domain.ValidationError{Message: "email is required", Field: "email"}
 	}
 	if req.Password == "" {
 		return &domain.ValidationError{Message: "password is required", Field: "password"}
 	}
+	if err := s.validator.ValidateEmail(req.Email); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "email"}
+	}
+	if err := s.validator.ValidatePassword(req.Password); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "password"}
+	}
 	return nil
 }
 
-func validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
+func (s *AuthServiceImpl) validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
 	if req.OtpHash == "" {
 		return &domain.ValidationError{Message: "otp_hash is required", Field: "otp_hash"}
 	}
@@ -249,24 +258,30 @@ func validateVerifyOTPRequest(req *pb.VerifyOTPRequest) error {
 	return nil
 }
 
-func validateLoginRequest(req *pb.LoginRequest) error {
+func (s *AuthServiceImpl) validateLoginRequest(req *pb.LoginRequest) error {
 	if req.Email == "" {
 		return &domain.ValidationError{Message: "email is required", Field: "email"}
 	}
 	if req.Password == "" {
 		return &domain.ValidationError{Message: "password is required", Field: "password"}
 	}
-	return nil
-}
-
-func validateForgotPasswordRequest(req *pb.ForgotPasswordRequest) error {
-	if req.Email == "" {
-		return &domain.ValidationError{Message: "email is required", Field: "email"}
+	if err := s.validator.ValidateEmail(req.Email); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "email"}
 	}
 	return nil
 }
 
-func validateResetPasswordRequest(req *pb.ResetPasswordRequest) error {
+func (s *AuthServiceImpl) validateForgotPasswordRequest(req *pb.ForgotPasswordRequest) error {
+	if req.Email == "" {
+		return &domain.ValidationError{Message: "email is required", Field: "email"}
+	}
+	if err := s.validator.ValidateEmail(req.Email); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "email"}
+	}
+	return nil
+}
+
+func (s *AuthServiceImpl) validateResetPasswordRequest(req *pb.ResetPasswordRequest) error {
 	if req.OtpHash == "" {
 		return &domain.ValidationError{Message: "otp_hash is required", Field: "otp_hash"}
 	}
@@ -275,6 +290,12 @@ func validateResetPasswordRequest(req *pb.ResetPasswordRequest) error {
 	}
 	if req.Password == "" {
 		return &domain.ValidationError{Message: "password is required", Field: "password"}
+	}
+	if err := s.validator.ValidateOTPCode(req.Code, 6); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "code"}
+	}
+	if err := s.validator.ValidatePassword(req.Password); err != nil {
+		return &domain.ValidationError{Message: err.Error(), Field: "password"}
 	}
 	return nil
 }

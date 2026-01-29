@@ -60,10 +60,6 @@ type GetUserByEmailResponse struct {
 // Used for internal lookups to find users by their email address.
 // Returns error if user not found or database query fails.
 func (s *AuthService) GetUserByEmail(ctx context.Context, req GetUserByEmailRequest) (*GetUserByEmailResponse, error) {
-	if req.Email == "" {
-		return nil, &domain.ValidationError{Message: "email is required", Field: "email"}
-	}
-
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, err
@@ -94,10 +90,6 @@ type DeleteUserResponse struct {
 // This operation removes the user, their credentials, sessions, and OTPs.
 // Returns error if user not found or database operation fails.
 func (s *AuthService) DeleteUser(ctx context.Context, req DeleteUserRequest) (*DeleteUserResponse, error) {
-	if req.UserID <= 0 {
-		return nil, &domain.ValidationError{Message: "user_id must be greater than zero", Field: "user_id"}
-	}
-
 	// Check if user exists
 	_, err := s.userRepo.GetByID(ctx, req.UserID)
 	if err != nil {

@@ -137,7 +137,7 @@ func TestGetUserValidation(t *testing.T) {
 			mockService := &MockAuthServiceForUser{
 				GetUserFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.GetUser(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -195,7 +195,7 @@ func TestGetUserByEmailValidation(t *testing.T) {
 			mockService := &MockAuthServiceForUser{
 				GetUserByEmailFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.GetUserByEmail(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -255,7 +255,7 @@ func TestDeleteUserValidation(t *testing.T) {
 			mockService := &MockAuthServiceForUser{
 				DeleteUserFunc: tc.MockFunc,
 			}
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.DeleteUser(context.Background(), tc.Request)
 
 			if tc.ExpectedError {
@@ -315,7 +315,7 @@ func TestGetUserErrorHandling(t *testing.T) {
 				GetUserFunc: tc.MockFunc,
 			}
 
-			controller := NewAuthServiceImpl(mockService)
+			controller := newTestController(mockService)
 			resp, err := controller.GetUser(context.Background(), tc.Request)
 
 			require.Error(t, err)

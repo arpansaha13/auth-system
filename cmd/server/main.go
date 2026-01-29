@@ -84,7 +84,6 @@ func main() {
 		otpRepo,
 		sessionRepo,
 		hasher,
-		validator,
 		service.AuthServiceConfig{
 			OTPExpiry:  cfg.OTPExpiry,
 			OTPLength:  cfg.OTPLength,
@@ -115,7 +114,7 @@ func main() {
 	)
 
 	// Register auth service
-	authServiceImpl := controller.NewAuthServiceImpl(authService)
+	authServiceImpl := controller.NewAuthServiceImpl(authService, validator)
 	pb.RegisterAuthServiceServer(grpcServer, authServiceImpl)
 
 	// Listen on port

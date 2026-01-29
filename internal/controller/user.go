@@ -13,7 +13,7 @@ import (
 // GetUser retrieves user information by user ID
 func (s *AuthServiceImpl) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	// Validate request
-	if err := validateGetUserRequest(req); err != nil {
+	if err := s.validateGetUserRequest(req); err != nil {
 		log.Printf("get user validation error: %v", err)
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (s *AuthServiceImpl) GetUser(ctx context.Context, req *pb.GetUserRequest) (
 // GetUserByEmail retrieves user information by email address
 func (s *AuthServiceImpl) GetUserByEmail(ctx context.Context, req *pb.GetUserByEmailRequest) (*pb.GetUserByEmailResponse, error) {
 	// Validate request
-	if err := validateGetUserByEmailRequest(req); err != nil {
+	if err := s.validateGetUserByEmailRequest(req); err != nil {
 		log.Printf("get user by email validation error: %v", err)
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (s *AuthServiceImpl) GetUserByEmail(ctx context.Context, req *pb.GetUserByE
 // DeleteUser deletes a user by user ID
 func (s *AuthServiceImpl) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	// Validate request
-	if err := validateDeleteUserRequest(req); err != nil {
+	if err := s.validateDeleteUserRequest(req); err != nil {
 		log.Printf("delete user validation error: %v", err)
 		return nil, err
 	}
@@ -94,23 +94,23 @@ func (s *AuthServiceImpl) DeleteUser(ctx context.Context, req *pb.DeleteUserRequ
 	}, nil
 }
 
-// Private helper and validation functions
+// Private helper and validation methods
 
-func validateGetUserRequest(req *pb.GetUserRequest) error {
+func (s *AuthServiceImpl) validateGetUserRequest(req *pb.GetUserRequest) error {
 	if req.UserId <= 0 {
 		return &domain.ValidationError{Message: "user_id must be greater than zero", Field: "user_id"}
 	}
 	return nil
 }
 
-func validateGetUserByEmailRequest(req *pb.GetUserByEmailRequest) error {
+func (s *AuthServiceImpl) validateGetUserByEmailRequest(req *pb.GetUserByEmailRequest) error {
 	if req.Email == "" {
 		return &domain.ValidationError{Message: "email is required", Field: "email"}
 	}
 	return nil
 }
 
-func validateDeleteUserRequest(req *pb.DeleteUserRequest) error {
+func (s *AuthServiceImpl) validateDeleteUserRequest(req *pb.DeleteUserRequest) error {
 	if req.UserId <= 0 {
 		return &domain.ValidationError{Message: "user_id must be greater than zero", Field: "user_id"}
 	}

@@ -17,11 +17,10 @@ import (
 // It provides methods for user registration, email verification, login, session validation, refresh, and logout.
 // All methods are context-aware and handle errors with domain-specific error types.
 type AuthService struct {
-	userRepo    *repository.UserRepository
-	otpRepo     *repository.OTPRepository
-	sessionRepo *repository.SessionRepository
+	userRepo    repository.IUserRepository
+	otpRepo     repository.IOTPRepository
+	sessionRepo repository.ISessionRepository
 	hasher      *utils.PasswordHasher
-	validator   *utils.Validator
 	config      AuthServiceConfig
 }
 
@@ -37,11 +36,10 @@ type AuthServiceConfig struct {
 // NewAuthService creates a new auth service with all dependencies initialized.
 // Returns a fully configured AuthService ready for use.
 func NewAuthService(
-	userRepo *repository.UserRepository,
-	otpRepo *repository.OTPRepository,
-	sessionRepo *repository.SessionRepository,
+	userRepo repository.IUserRepository,
+	otpRepo repository.IOTPRepository,
+	sessionRepo repository.ISessionRepository,
 	hasher *utils.PasswordHasher,
-	validator *utils.Validator,
 	config AuthServiceConfig,
 ) *AuthService {
 	return &AuthService{
@@ -49,7 +47,6 @@ func NewAuthService(
 		otpRepo:     otpRepo,
 		sessionRepo: sessionRepo,
 		hasher:      hasher,
-		validator:   validator,
 		config:      config,
 	}
 }
@@ -71,15 +68,6 @@ type SignupResponse struct {
 // and enqueues email task for async delivery. OTP expires in 10 minutes.
 // Returns error if email already exists, validation fails, or database operations fail.
 func (s *AuthService) Signup(ctx context.Context, req SignupRequest) (*SignupResponse, error) {
-	// Validate input
-	if err := s.validator.ValidateEmail(req.Email); err != nil {
-		return nil, &domain.ValidationError{Message: "invalid email format", Field: "email"}
-	}
-
-	if err := s.validator.ValidatePassword(req.Password); err != nil {
-		return nil, &domain.ValidationError{Message: "password must be at least 8 characters", Field: "password"}
-	}
-
 	// Check if email already exists
 	exists, err := s.userRepo.ExistsEmail(ctx, req.Email)
 	if err != nil {
@@ -173,11 +161,6 @@ type VerifyOTPResponse struct {
 // or login with email/password.
 // Returns error if OTP is invalid, expired, already verified, or validation fails.
 func (s *AuthService) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyOTPResponse, error) {
-	// Validate input
-	if err := s.validator.ValidateOTPCode(req.Code, s.config.OTPLength); err != nil {
-		return nil, &domain.ValidationError{Message: "invalid otp format", Field: "code"}
-	}
-
 	if req.OTPHash == "" {
 		return nil, &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"}
 	}
@@ -270,11 +253,6 @@ type LoginResponse struct {
 // and updates the user's last_login timestamp.
 // Returns error if user not found, password incorrect, email not verified, or database operations fail.
 func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
-	// Validate input
-	if err := s.validator.ValidateEmail(req.Email); err != nil {
-		return nil, &domain.ValidationError{Message: "invalid email", Field: "email"}
-	}
-
 	// Get user
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
@@ -457,11 +435,6 @@ type ForgotPasswordResponse struct {
 // OTP expires in 10 minutes.
 // Returns error if email doesn't exist or database operations fail.
 func (s *AuthService) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
-	// Validate input
-	if err := s.validator.ValidateEmail(req.Email); err != nil {
-		return nil, &domain.ValidationError{Message: "invalid email format", Field: "email"}
-	}
-
 	// Get user by email
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
@@ -539,17 +512,8 @@ type ResetPasswordResponse struct {
 // User must provide the OTP hash and code from the forgot password flow.
 // Returns error if OTP is invalid, expired, or password update fails.
 func (s *AuthService) ResetPassword(ctx context.Context, req ResetPasswordRequest) (*ResetPasswordResponse, error) {
-	// Validate input
-	if err := s.validator.ValidateOTPCode(req.Code, s.config.OTPLength); err != nil {
-		return nil, &domain.ValidationError{Message: "invalid otp format", Field: "code"}
-	}
-
 	if req.OTPHash == "" {
 		return nil, &domain.ValidationError{Message: "otp hash is required", Field: "otp_hash"}
-	}
-
-	if err := s.validator.ValidatePassword(req.Password); err != nil {
-		return nil, &domain.ValidationError{Message: "password must be at least 8 characters", Field: "password"}
 	}
 
 	// Get OTP by hash and purpose (forgot password)
