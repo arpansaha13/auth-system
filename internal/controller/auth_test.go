@@ -9,113 +9,10 @@ import (
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
+	"github.com/arpansaha13/auth-system/internal/service/mocks"
 	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/pb"
 )
-
-// MockAuthService mocks the auth service for controller tests
-type MockAuthService struct {
-	SignupFunc          func(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error)
-	VerifyOTPFunc       func(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error)
-	LoginFunc           func(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error)
-	ValidateSessionFunc func(ctx context.Context, req service.ValidateSessionRequest) (*service.ValidateSessionResponse, error)
-	RefreshSessionFunc  func(ctx context.Context, req service.RefreshSessionRequest) (*service.RefreshSessionResponse, error)
-	LogoutFunc          func(ctx context.Context, req service.LogoutRequest) (*service.LogoutResponse, error)
-	ForgotPasswordFunc  func(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error)
-	ResetPasswordFunc   func(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error)
-	GetUserFunc         func(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error)
-	GetUserByEmailFunc  func(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error)
-	DeleteUserFunc      func(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error)
-}
-
-func (m *MockAuthService) Signup(ctx context.Context, req service.SignupRequest) (*service.SignupResponse, error) {
-	if m.SignupFunc != nil {
-		return m.SignupFunc(ctx, req)
-	}
-	return &service.SignupResponse{Message: "success", OTPHash: "test-hash"}, nil
-}
-
-func (m *MockAuthService) VerifyOTP(ctx context.Context, req service.VerifyOTPRequest) (*service.VerifyOTPResponse, error) {
-	if m.VerifyOTPFunc != nil {
-		return m.VerifyOTPFunc(ctx, req)
-	}
-	return &service.VerifyOTPResponse{Message: "success", Username: "test_user", SessionToken: "token"}, nil
-}
-
-func (m *MockAuthService) Login(ctx context.Context, req service.LoginRequest) (*service.LoginResponse, error) {
-	if m.LoginFunc != nil {
-		return m.LoginFunc(ctx, req)
-	}
-	return &service.LoginResponse{SessionToken: "token"}, nil
-}
-
-func (m *MockAuthService) ValidateSession(ctx context.Context, req service.ValidateSessionRequest) (*service.ValidateSessionResponse, error) {
-	if m.ValidateSessionFunc != nil {
-		return m.ValidateSessionFunc(ctx, req)
-	}
-	return &service.ValidateSessionResponse{Valid: true, UserID: 1}, nil
-}
-
-func (m *MockAuthService) RefreshSession(ctx context.Context, req service.RefreshSessionRequest) (*service.RefreshSessionResponse, error) {
-	if m.RefreshSessionFunc != nil {
-		return m.RefreshSessionFunc(ctx, req)
-	}
-	return &service.RefreshSessionResponse{NewSessionToken: "new-token"}, nil
-}
-
-func (m *MockAuthService) Logout(ctx context.Context, req service.LogoutRequest) (*service.LogoutResponse, error) {
-	if m.LogoutFunc != nil {
-		return m.LogoutFunc(ctx, req)
-	}
-	return &service.LogoutResponse{Message: "logout successful"}, nil
-}
-
-func (m *MockAuthService) ForgotPassword(ctx context.Context, req service.ForgotPasswordRequest) (*service.ForgotPasswordResponse, error) {
-	if m.ForgotPasswordFunc != nil {
-		return m.ForgotPasswordFunc(ctx, req)
-	}
-	return &service.ForgotPasswordResponse{Message: "if email exists, reset link will be sent", OTPHash: "test-hash"}, nil
-}
-
-func (m *MockAuthService) ResetPassword(ctx context.Context, req service.ResetPasswordRequest) (*service.ResetPasswordResponse, error) {
-	if m.ResetPasswordFunc != nil {
-		return m.ResetPasswordFunc(ctx, req)
-	}
-	return &service.ResetPasswordResponse{Message: "password reset successfully"}, nil
-}
-
-func (m *MockAuthService) GetUser(ctx context.Context, req service.GetUserRequest) (*service.GetUserResponse, error) {
-	if m.GetUserFunc != nil {
-		return m.GetUserFunc(ctx, req)
-	}
-	return &service.GetUserResponse{
-		User: service.UserData{
-			UserID:   1,
-			Email:    "test@example.com",
-			Username: "test_user",
-		},
-	}, nil
-}
-
-func (m *MockAuthService) GetUserByEmail(ctx context.Context, req service.GetUserByEmailRequest) (*service.GetUserByEmailResponse, error) {
-	if m.GetUserByEmailFunc != nil {
-		return m.GetUserByEmailFunc(ctx, req)
-	}
-	return &service.GetUserByEmailResponse{
-		User: service.UserData{
-			UserID:   1,
-			Email:    req.Email,
-			Username: "test_user",
-		},
-	}, nil
-}
-
-func (m *MockAuthService) DeleteUser(ctx context.Context, req service.DeleteUserRequest) (*service.DeleteUserResponse, error) {
-	if m.DeleteUserFunc != nil {
-		return m.DeleteUserFunc(ctx, req)
-	}
-	return &service.DeleteUserResponse{Message: "user deleted successfully"}, nil
-}
 
 // newTestController creates a new AuthServiceImpl with a real validator for testing
 func newTestController(mockService service.IAuthService) *AuthServiceImpl {
@@ -176,7 +73,7 @@ func TestSignupValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				SignupFunc: tc.MockFunc,
 			}
 			controller := newTestController(mockService)
@@ -254,7 +151,7 @@ func TestVerifyOTPValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				VerifyOTPFunc: tc.MockFunc,
 			}
 			controller := newTestController(mockService)
@@ -328,7 +225,7 @@ func TestLoginValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				LoginFunc: tc.MockFunc,
 			}
 			controller := newTestController(mockService)
@@ -402,7 +299,7 @@ func TestSignupErrorHandling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				SignupFunc: tc.MockFunc,
 			}
 
@@ -452,7 +349,7 @@ func TestForgotPasswordValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				ForgotPasswordFunc: tc.MockFunc,
 			}
 
@@ -543,7 +440,7 @@ func TestResetPasswordValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			mockService := &MockAuthService{
+			mockService := &mocks.MockAuthService{
 				ResetPasswordFunc: tc.MockFunc,
 			}
 
