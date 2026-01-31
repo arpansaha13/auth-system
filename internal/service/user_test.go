@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -9,8 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/repository/mocks"
+	"github.com/arpansaha13/auth-system/internal/service"
 	"github.com/arpansaha13/auth-system/internal/utils"
+	"github.com/arpansaha13/auth-system/tests/mocks"
 )
 
 func TestAuthService_GetUser(t *testing.T) {
@@ -21,7 +22,7 @@ func TestAuthService_GetUser(t *testing.T) {
 		mockOTPRepo      func() *mocks.MockOTPRepository
 		mockSessionRepo  func() *mocks.MockSessionRepository
 		expectedError    bool
-		validateResponse func(t *testing.T, resp *GetUserResponse)
+		validateResponse func(t *testing.T, resp *service.GetUserResponse)
 	}{
 		{
 			name:   "successful get user",
@@ -47,7 +48,7 @@ func TestAuthService_GetUser(t *testing.T) {
 				return &mocks.MockSessionRepository{}
 			},
 			expectedError: false,
-			validateResponse: func(t *testing.T, resp *GetUserResponse) {
+			validateResponse: func(t *testing.T, resp *service.GetUserResponse) {
 				assert.Equal(t, int64(1), resp.User.UserID)
 				assert.Equal(t, "test@example.com", resp.User.Email)
 				assert.Equal(t, "testuser", resp.User.Username)
@@ -81,14 +82,14 @@ func TestAuthService_GetUser(t *testing.T) {
 			otpRepo := tt.mockOTPRepo()
 			sessionRepo := tt.mockSessionRepo()
 
-			config := AuthServiceConfig{
+			config := service.AuthServiceConfig{
 				OTPExpiry:  time.Minute * 10,
 				OTPLength:  6,
 				SessionTTL: time.Hour * 24,
 				SecretKey:  "secret",
 			}
-			svc := NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
-			resp, err := svc.GetUser(context.Background(), GetUserRequest{UserID: tt.userID})
+			svc := service.NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
+			resp, err := svc.GetUser(context.Background(), service.GetUserRequest{UserID: tt.userID})
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -108,7 +109,7 @@ func TestAuthService_GetUserByEmail(t *testing.T) {
 		mockOTPRepo      func() *mocks.MockOTPRepository
 		mockSessionRepo  func() *mocks.MockSessionRepository
 		expectedError    bool
-		validateResponse func(t *testing.T, resp *GetUserByEmailResponse)
+		validateResponse func(t *testing.T, resp *service.GetUserByEmailResponse)
 	}{
 		{
 			name:  "successful get user by email",
@@ -134,7 +135,7 @@ func TestAuthService_GetUserByEmail(t *testing.T) {
 				return &mocks.MockSessionRepository{}
 			},
 			expectedError: false,
-			validateResponse: func(t *testing.T, resp *GetUserByEmailResponse) {
+			validateResponse: func(t *testing.T, resp *service.GetUserByEmailResponse) {
 				assert.Equal(t, int64(1), resp.User.UserID)
 				assert.Equal(t, "test@example.com", resp.User.Email)
 				assert.Equal(t, "testuser", resp.User.Username)
@@ -168,14 +169,14 @@ func TestAuthService_GetUserByEmail(t *testing.T) {
 			otpRepo := tt.mockOTPRepo()
 			sessionRepo := tt.mockSessionRepo()
 
-			config := AuthServiceConfig{
+			config := service.AuthServiceConfig{
 				OTPExpiry:  time.Minute * 10,
 				OTPLength:  6,
 				SessionTTL: time.Hour * 24,
 				SecretKey:  "secret",
 			}
-			svc := NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
-			resp, err := svc.GetUserByEmail(context.Background(), GetUserByEmailRequest{Email: tt.email})
+			svc := service.NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
+			resp, err := svc.GetUserByEmail(context.Background(), service.GetUserByEmailRequest{Email: tt.email})
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -195,7 +196,7 @@ func TestAuthService_DeleteUser(t *testing.T) {
 		mockOTPRepo      func() *mocks.MockOTPRepository
 		mockSessionRepo  func() *mocks.MockSessionRepository
 		expectedError    bool
-		validateResponse func(t *testing.T, resp *DeleteUserResponse)
+		validateResponse func(t *testing.T, resp *service.DeleteUserResponse)
 	}{
 		{
 			name:   "successful delete user",
@@ -224,7 +225,7 @@ func TestAuthService_DeleteUser(t *testing.T) {
 				return &mocks.MockSessionRepository{}
 			},
 			expectedError: false,
-			validateResponse: func(t *testing.T, resp *DeleteUserResponse) {
+			validateResponse: func(t *testing.T, resp *service.DeleteUserResponse) {
 				assert.NotEmpty(t, resp.Message)
 				assert.Contains(t, resp.Message, "deleted")
 			},
@@ -256,14 +257,14 @@ func TestAuthService_DeleteUser(t *testing.T) {
 			otpRepo := tt.mockOTPRepo()
 			sessionRepo := tt.mockSessionRepo()
 
-			config := AuthServiceConfig{
+			config := service.AuthServiceConfig{
 				OTPExpiry:  time.Minute * 10,
 				OTPLength:  6,
 				SessionTTL: time.Hour * 24,
 				SecretKey:  "secret",
 			}
-			svc := NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
-			resp, err := svc.DeleteUser(context.Background(), DeleteUserRequest{UserID: tt.userID})
+			svc := service.NewAuthService(userRepo, otpRepo, sessionRepo, hasher, config)
+			resp, err := svc.DeleteUser(context.Background(), service.DeleteUserRequest{UserID: tt.userID})
 
 			if tt.expectedError {
 				assert.Error(t, err)
