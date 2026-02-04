@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -12,8 +12,18 @@ import (
 	"github.com/arpansaha13/auth-system/pb"
 )
 
+// AuthTestSuite is a test suite for auth endpoints
+type AuthTestSuite struct {
+	BaseTestSuite
+}
+
+// SetupTest prepares each test
+func (s *AuthTestSuite) SetupTest() {
+	s.CleanupTablesForSuite()
+}
+
 // TestSignupEndpoint tests the Signup gRPC endpoint
-func TestSignup(t *testing.T) {
+func (s *AuthTestSuite) TestSignup() {
 	tests := []TableDrivenTestCase{
 		{
 			Name: "Signup with valid email and password",
@@ -26,9 +36,9 @@ func TestSignup(t *testing.T) {
 					Password: "securePassword123",
 				})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, resp.Message, "expected message in response")
-				require.NotEmpty(f.T, resp.OtpHash, "expected OTP hash in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(resp.Message, "expected message in response")
+				s.Require().NotEmpty(resp.OtpHash, "expected OTP hash in response")
 				return nil
 			},
 			ExpectError: false,
@@ -50,9 +60,9 @@ func TestSignup(t *testing.T) {
 				})
 
 				// We expect an error for duplicate email
-				require.Error(f.T, err, "expected error for duplicate email")
+				s.Require().Error(err, "expected error for duplicate email")
 				// If we got an error as expected, that's success
-				require.Nil(f.T, resp)
+				s.Require().Nil(resp)
 				return nil
 			},
 			ExpectError: false,
@@ -60,22 +70,22 @@ func TestSignup(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -83,7 +93,7 @@ func TestSignup(t *testing.T) {
 }
 
 // TestVerifyOTPEndpoint tests the VerifyOTP gRPC endpoint
-func TestVerifyOTP(t *testing.T) {
+func (s *AuthTestSuite) TestVerifyOTP() {
 	testOTPCode := "123456"
 	testEmail := "verify@example.com"
 
@@ -112,7 +122,7 @@ func TestVerifyOTP(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get the OTP by looking for one with hashed code set
 				var otp domain.OTP
-				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", testEmail).
+				s.Require().NoError(f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", testEmail).
 					First(&otp).Error)
 
 				verifyResp, err := f.GRPCClient.VerifyOTP(f.Ctx, &pb.VerifyOTPRequest{
@@ -120,9 +130,9 @@ func TestVerifyOTP(t *testing.T) {
 					Code:    testOTPCode,
 				})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, verifyResp.Username, "expected username in response")
-				require.NotEmpty(f.T, verifyResp.SessionToken, "expected session token in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(verifyResp.Username, "expected username in response")
+				s.Require().NotEmpty(verifyResp.SessionToken, "expected session token in response")
 				return nil
 			},
 			ExpectError: false,
@@ -149,7 +159,7 @@ func TestVerifyOTP(t *testing.T) {
 			},
 			Test: func(f *TestFixture) error {
 				var otp domain.OTP
-				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "verify-wrong@example.com").
+				s.Require().NoError(f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "verify-wrong@example.com").
 					First(&otp).Error)
 
 				verifyResp, err := f.GRPCClient.VerifyOTP(f.Ctx, &pb.VerifyOTPRequest{
@@ -158,9 +168,9 @@ func TestVerifyOTP(t *testing.T) {
 				})
 
 				// We expect an error for incorrect code
-				require.Error(f.T, err, "expected error for incorrect OTP code")
+				s.Require().Error(err, "expected error for incorrect OTP code")
 				// If we got an error as expected, that's success
-				require.Nil(f.T, verifyResp)
+				s.Require().Nil(verifyResp)
 				return nil
 			},
 			ExpectError: false,
@@ -168,22 +178,22 @@ func TestVerifyOTP(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -191,7 +201,7 @@ func TestVerifyOTP(t *testing.T) {
 }
 
 // TestLoginEndpoint tests the Login gRPC endpoint
-func TestLogin(t *testing.T) {
+func (s *AuthTestSuite) TestLogin() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -229,9 +239,9 @@ func TestLogin(t *testing.T) {
 					Password: "securePassword123",
 				})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, loginResp.SessionToken, "expected session token in response")
-				require.NotNil(f.T, loginResp.ExpiresAt, "expected expiration time in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(loginResp.SessionToken, "expected session token in response")
+				s.Require().NotNil(loginResp.ExpiresAt, "expected expiration time in response")
 				return nil
 			},
 			ExpectError: false,
@@ -253,9 +263,9 @@ func TestLogin(t *testing.T) {
 				})
 
 				// We expect an error for unverified user
-				require.Error(f.T, err, "expected error for unverified user")
+				s.Require().Error(err, "expected error for unverified user")
 				// If we got an error as expected, that's success for this test
-				require.Nil(f.T, loginResp)
+				s.Require().Nil(loginResp)
 				return nil
 			},
 			ExpectError: false,
@@ -263,22 +273,22 @@ func TestLogin(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -286,7 +296,7 @@ func TestLogin(t *testing.T) {
 }
 
 // TestForgotPasswordEndpoint tests the ForgotPassword gRPC endpoint
-func TestForgotPassword(t *testing.T) {
+func (s *AuthTestSuite) TestForgotPassword() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -323,9 +333,9 @@ func TestForgotPassword(t *testing.T) {
 					Email: "forgot@example.com",
 				})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, forgotResp.Message, "expected message in response")
-				require.NotEmpty(f.T, forgotResp.OtpHash, "expected OTP hash in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(forgotResp.Message, "expected message in response")
+				s.Require().NotEmpty(forgotResp.OtpHash, "expected OTP hash in response")
 				return nil
 			},
 			ExpectError: false,
@@ -333,22 +343,22 @@ func TestForgotPassword(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -356,7 +366,7 @@ func TestForgotPassword(t *testing.T) {
 }
 
 // TestResetPasswordEndpoint tests the ResetPassword gRPC endpoint
-func TestResetPassword(t *testing.T) {
+func (s *AuthTestSuite) TestResetPassword() {
 	testOTPCode := "123456"
 	resetOTPCode := "654321"
 
@@ -407,7 +417,7 @@ func TestResetPassword(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get the most recent OTP (reset password OTP)
 				var otp domain.OTP
-				require.NoError(f.T, f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "reset@example.com").
+				s.Require().NoError(f.TestDB.DB.Where("user_id IN (SELECT id FROM users WHERE email = ?)", "reset@example.com").
 					Order("created_at DESC").
 					First(&otp).Error)
 
@@ -417,8 +427,8 @@ func TestResetPassword(t *testing.T) {
 					Password: "newPassword123",
 				})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, resetResp.Message, "expected message in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(resetResp.Message, "expected message in response")
 				return nil
 			},
 			ExpectError: false,
@@ -426,22 +436,22 @@ func TestResetPassword(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -449,7 +459,7 @@ func TestResetPassword(t *testing.T) {
 }
 
 // TestValidateSessionEndpoint tests the ValidateSession gRPC endpoint
-func TestValidateSession(t *testing.T) {
+func (s *AuthTestSuite) TestValidateSession() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -487,7 +497,7 @@ func TestValidateSession(t *testing.T) {
 					Email:    "validate@example.com",
 					Password: "securePassword123",
 				})
-				require.NoError(f.T, err)
+				s.Require().NoError(err)
 
 				// Create context with token metadata
 				md := metadata.Pairs("authorization", "Bearer "+loginResp.SessionToken)
@@ -495,8 +505,8 @@ func TestValidateSession(t *testing.T) {
 
 				validateResp, err := f.GRPCClient.ValidateSession(ctxWithToken, &pb.ValidateSessionRequest{})
 
-				require.NoError(f.T, err)
-				require.True(f.T, validateResp.Valid, "expected valid session")
+				s.Require().NoError(err)
+				s.Require().True(validateResp.Valid, "expected valid session")
 				return nil
 			},
 			ExpectError: false,
@@ -504,22 +514,22 @@ func TestValidateSession(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -527,7 +537,7 @@ func TestValidateSession(t *testing.T) {
 }
 
 // TestRefreshSessionEndpoint tests the RefreshSession gRPC endpoint
-func TestRefreshSession(t *testing.T) {
+func (s *AuthTestSuite) TestRefreshSession() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -565,7 +575,7 @@ func TestRefreshSession(t *testing.T) {
 					Email:    "refresh@example.com",
 					Password: "securePassword123",
 				})
-				require.NoError(f.T, err)
+				s.Require().NoError(err)
 
 				// Create context with token metadata
 				md := metadata.Pairs("authorization", "Bearer "+loginResp.SessionToken)
@@ -573,8 +583,8 @@ func TestRefreshSession(t *testing.T) {
 
 				refreshResp, err := f.GRPCClient.RefreshSession(ctxWithToken, &pb.RefreshSessionRequest{})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, refreshResp.NewSessionToken, "expected new token in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(refreshResp.NewSessionToken, "expected new token in response")
 				return nil
 			},
 			ExpectError: false,
@@ -582,24 +592,29 @@ func TestRefreshSession(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
 	}
+}
+
+// TestAuthService runs the authentication test suite
+func TestAuthService(t *testing.T) {
+	suite.Run(t, new(AuthTestSuite))
 }

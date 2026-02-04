@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"google.golang.org/grpc"
@@ -25,20 +24,25 @@ import (
 	"github.com/arpansaha13/auth-system/pb"
 )
 
-var (
-	globalContainer    testcontainers.Container
-	globalDB           *gorm.DB
-	globalCtx          context.Context
-	globalGRPCClient   pb.AuthServiceClient
-	globalGRPCConn     *grpc.ClientConn
-	globalGRPCListener net.Listener
-	globalGRPCServer   *grpc.Server
-)
+// BaseTestSuite provides common test setup and teardown for all test suites
+type BaseTestSuite struct {
+	suite.Suite
+	Container     testcontainers.Container
+	DB            *gorm.DB
+	Ctx           context.Context
+	GRPCClient    pb.AuthServiceClient
+	GRPCConn      *grpc.ClientConn
+	GRPCListener  net.Listener
+	GRPCServer    *grpc.Server
+	AuthService   *service.AuthService
+	EmailPool     *worker.EmailWorkerPool
+	EmailProvider *worker.MockEmailProvider
+}
 
-// TestMain sets up shared database for all tests
-func TestMain(m *testing.M) {
+// SetupSuite initializes the test environment (runs once before all tests)
+func (s *BaseTestSuite) SetupSuite() {
 	ctx := context.Background()
-	globalCtx = ctx
+	s.Ctx = ctx
 
 	// Start PostgreSQL container
 	req := testcontainers.ContainerRequest{
@@ -58,27 +62,15 @@ func TestMain(m *testing.M) {
 		ContainerRequest: req,
 		Started:          true,
 	})
-	if err != nil {
-		fmt.Printf("Failed to start container: %v\n", err)
-		return
-	}
-
-	globalContainer = container
+	s.Require().NoError(err, "Failed to start PostgreSQL container")
+	s.Container = container
 
 	// Get container host and port
 	host, err := container.Host(ctx)
-	if err != nil {
-		fmt.Printf("Failed to get host: %v\n", err)
-		globalContainer.Terminate(ctx)
-		return
-	}
+	s.Require().NoError(err, "Failed to get container host")
 
 	port, err := container.MappedPort(ctx, "5432")
-	if err != nil {
-		fmt.Printf("Failed to get port: %v\n", err)
-		globalContainer.Terminate(ctx)
-		return
-	}
+	s.Require().NoError(err, "Failed to get container port")
 
 	// Connect to database
 	dsn := fmt.Sprintf(
@@ -87,50 +79,58 @@ func TestMain(m *testing.M) {
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		fmt.Printf("Failed to connect to database: %v\n", err)
-		globalContainer.Terminate(ctx)
-		return
-	}
-
-	globalDB = db
+	s.Require().NoError(err, "Failed to connect to database")
+	s.DB = db
 
 	// Run migrations
-	if err := domain.AutoMigrate(db); err != nil {
-		fmt.Printf("Failed to run migrations: %v\n", err)
-		globalContainer.Terminate(ctx)
-		os.Exit(1)
-	}
+	err = domain.AutoMigrate(db)
+	s.Require().NoError(err, "Failed to run migrations")
 
 	// Setup gRPC server
-	if err := setupGRPCServer(db); err != nil {
-		fmt.Printf("Failed to setup gRPC server: %v\n", err)
-		globalContainer.Terminate(ctx)
-		os.Exit(1)
+	err = s.setupGRPCServer(ctx, db)
+	s.Require().NoError(err, "Failed to setup gRPC server")
+}
+
+// TearDownSuite cleans up the test environment (runs once after all tests)
+func (s *BaseTestSuite) TearDownSuite() {
+	if s.GRPCServer != nil {
+		s.GRPCServer.Stop()
 	}
+	if s.GRPCConn != nil {
+		s.GRPCConn.Close()
+	}
+	if s.Container != nil {
+		s.Container.Terminate(s.Ctx)
+	}
+}
 
-	code := m.Run()
+// SetupTest prepares each test (cleans tables)
+func (s *BaseTestSuite) SetupTest() {
+	s.CleanupTablesForSuite()
+}
 
-	// Cleanup
-	globalGRPCServer.Stop()
-	globalGRPCConn.Close()
-	globalContainer.Terminate(ctx)
-	os.Exit(code)
+// CleanupTablesForSuite truncates all tables for test isolation
+func (s *BaseTestSuite) CleanupTablesForSuite() {
+	tables := []string{"sessions", "otps", "credentials", "users"}
+
+	for _, table := range tables {
+		err := s.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error
+		s.Require().NoError(err, "Failed to truncate table %s", table)
+	}
 }
 
 // setupGRPCServer sets up the gRPC server with interceptors and client
-func setupGRPCServer(db *gorm.DB) error {
+func (s *BaseTestSuite) setupGRPCServer(ctx context.Context, db *gorm.DB) error {
 	var err error
 
 	// Create listener
-	globalGRPCListener, err = net.Listen("tcp", "127.0.0.1:0")
+	s.GRPCListener, err = net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return fmt.Errorf("failed to create listener: %w", err)
 	}
 
-	// Import necessary packages for server setup
 	// Create gRPC server with interceptors
-	globalGRPCServer = grpc.NewServer(
+	s.GRPCServer = grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.ChainUnaryInterceptors(
 			middleware.ErrorInterceptor(),
 			middleware.RecoveryInterceptor(),
@@ -145,10 +145,10 @@ func setupGRPCServer(db *gorm.DB) error {
 	sessionRepo := repository.NewSessionRepository(db)
 	hasher := utils.NewPasswordHasher()
 	validator := utils.NewValidator()
-	emailProvider := worker.NewMockEmailProvider()
-	emailPool := worker.NewEmailWorkerPool(2, 50, emailProvider)
+	s.EmailProvider = worker.NewMockEmailProvider()
+	s.EmailPool = worker.NewEmailWorkerPool(2, 50, s.EmailProvider)
 
-	authService := service.NewAuthService(
+	s.AuthService = service.NewAuthService(
 		userRepo,
 		otpRepo,
 		sessionRepo,
@@ -158,67 +158,31 @@ func setupGRPCServer(db *gorm.DB) error {
 			OTPLength:  6,
 			SessionTTL: 30 * time.Minute,
 			SecretKey:  "test-secret-key-at-least-32-characters-long-ok",
-			EmailPool:  emailPool,
+			EmailPool:  s.EmailPool,
 		},
 	)
 
-	authServiceImpl := controller.NewAuthServiceImpl(authService, validator)
-	pb.RegisterAuthServiceServer(globalGRPCServer, authServiceImpl)
+	authServiceImpl := controller.NewAuthServiceImpl(s.AuthService, validator)
+	pb.RegisterAuthServiceServer(s.GRPCServer, authServiceImpl)
 
 	// Start server in goroutine
 	go func() {
-		if err := globalGRPCServer.Serve(globalGRPCListener); err != nil {
+		if err := s.GRPCServer.Serve(s.GRPCListener); err != nil {
 			fmt.Printf("gRPC server error: %v\n", err)
 		}
 	}()
 
 	// Create client
 	conn, err := grpc.Dial(
-		globalGRPCListener.Addr().String(),
+		s.GRPCListener.Addr().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create gRPC connection: %w", err)
 	}
 
-	globalGRPCConn = conn
-	globalGRPCClient = pb.NewAuthServiceClient(conn)
+	s.GRPCConn = conn
+	s.GRPCClient = pb.NewAuthServiceClient(conn)
 
 	return nil
-}
-
-func exit(code int) {
-	globalContainer.Terminate(globalCtx)
-	testingExit(code)
-}
-
-// testingExit will be replaced in tests
-var testingExit = func(code int) {
-	os.Exit(code)
-}
-
-// GetTestDB returns the global test database
-func GetTestDB() *gorm.DB {
-	return globalDB
-}
-
-// GetTestContext returns the global test context
-func GetTestContext() context.Context {
-	return globalCtx
-}
-
-// GetGRPCClient returns the global gRPC client
-func GetGRPCClient() pb.AuthServiceClient {
-	return globalGRPCClient
-}
-
-// CleanupTables truncates all tables to ensure test isolation
-func CleanupTables(t *testing.T) {
-	tables := []string{"sessions", "otps", "credentials", "users"}
-
-	for _, table := range tables {
-		if err := globalDB.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error; err != nil {
-			t.Fatalf("Failed to truncate table %s: %v", table, err)
-		}
-	}
 }

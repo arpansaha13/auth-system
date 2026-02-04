@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
@@ -12,8 +12,18 @@ import (
 	"github.com/arpansaha13/auth-system/pb"
 )
 
+// UserTestSuite is a test suite for user endpoints
+type UserTestSuite struct {
+	BaseTestSuite
+}
+
+// SetupTest prepares each test
+func (s *UserTestSuite) SetupTest() {
+	s.CleanupTablesForSuite()
+}
+
 // TestGetUserEndpoint tests the GetUser gRPC endpoint
-func TestGetUser(t *testing.T) {
+func (s *UserTestSuite) TestGetUser() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -48,11 +58,11 @@ func TestGetUser(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get a valid session
 				var session domain.Session
-				require.NoError(f.T, f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
+				s.Require().NoError(f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
 
 				// Get the user
 				var user domain.User
-				require.NoError(f.T, f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
+				s.Require().NoError(f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
 
 				// Add token to context
 				md := metadata.Pairs("authorization", "Bearer test-token")
@@ -60,10 +70,10 @@ func TestGetUser(t *testing.T) {
 
 				resp, err := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: int64(user.ID)})
 
-				require.NoError(f.T, err)
-				require.NotNil(f.T, resp.User, "expected user in response")
-				require.Equal(f.T, "getuser@example.com", resp.User.Email, "email mismatch")
-				require.True(f.T, resp.User.Verified, "expected user to be verified")
+				s.Require().NoError(err)
+				s.Require().NotNil(resp.User, "expected user in response")
+				s.Require().Equal("getuser@example.com", resp.User.Email, "email mismatch")
+				s.Require().True(resp.User.Verified, "expected user to be verified")
 				return nil
 			},
 			ExpectError: false,
@@ -80,9 +90,9 @@ func TestGetUser(t *testing.T) {
 				resp, err := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: 99999})
 
 				// We expect an error for non-existent user
-				require.Error(f.T, err, "expected error for non-existent user")
+				s.Require().Error(err, "expected error for non-existent user")
 				// If we got an error as expected, that's success
-				require.Nil(f.T, resp)
+				s.Require().Nil(resp)
 				return nil
 			},
 			ExpectError: false,
@@ -90,22 +100,22 @@ func TestGetUser(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -113,7 +123,7 @@ func TestGetUser(t *testing.T) {
 }
 
 // TestGetUserByEmailEndpoint tests the GetUserByEmail gRPC endpoint
-func TestGetUserByEmail(t *testing.T) {
+func (s *UserTestSuite) TestGetUserByEmail() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -151,10 +161,10 @@ func TestGetUserByEmail(t *testing.T) {
 
 				resp, err := f.GRPCClient.GetUserByEmail(ctxWithToken, &pb.GetUserByEmailRequest{Email: "getuserbyemail@example.com"})
 
-				require.NoError(f.T, err)
-				require.NotNil(f.T, resp.User, "expected user in response")
-				require.Equal(f.T, "getuserbyemail@example.com", resp.User.Email, "email mismatch")
-				require.True(f.T, resp.User.Verified, "expected user to be verified")
+				s.Require().NoError(err)
+				s.Require().NotNil(resp.User, "expected user in response")
+				s.Require().Equal("getuserbyemail@example.com", resp.User.Email, "email mismatch")
+				s.Require().True(resp.User.Verified, "expected user to be verified")
 				return nil
 			},
 			ExpectError: false,
@@ -171,9 +181,9 @@ func TestGetUserByEmail(t *testing.T) {
 				resp, err := f.GRPCClient.GetUserByEmail(ctxWithToken, &pb.GetUserByEmailRequest{Email: "nonexistent@example.com"})
 
 				// We expect an error for non-existent email
-				require.Error(f.T, err, "expected error for non-existent email")
+				s.Require().Error(err, "expected error for non-existent email")
 				// If we got an error as expected, that's success
-				require.Nil(f.T, resp)
+				s.Require().Nil(resp)
 				return nil
 			},
 			ExpectError: false,
@@ -181,22 +191,22 @@ func TestGetUserByEmail(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
@@ -204,7 +214,7 @@ func TestGetUserByEmail(t *testing.T) {
 }
 
 // TestDeleteUserEndpoint tests the DeleteUser gRPC endpoint
-func TestDeleteUser(t *testing.T) {
+func (s *UserTestSuite) TestDeleteUser() {
 	testOTPCode := "123456"
 
 	tests := []TableDrivenTestCase{
@@ -239,11 +249,11 @@ func TestDeleteUser(t *testing.T) {
 			Test: func(f *TestFixture) error {
 				// Get a valid session
 				var session domain.Session
-				require.NoError(f.T, f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
+				s.Require().NoError(f.TestDB.DB.Where("deleted_at IS NULL").First(&session).Error)
 
 				// Get the user
 				var user domain.User
-				require.NoError(f.T, f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
+				s.Require().NoError(f.TestDB.DB.Where("id = ?", session.UserID).First(&user).Error)
 
 				// Add token to context
 				md := metadata.Pairs("authorization", "Bearer test-token")
@@ -251,12 +261,12 @@ func TestDeleteUser(t *testing.T) {
 
 				resp, err := f.GRPCClient.DeleteUser(ctxWithToken, &pb.DeleteUserRequest{UserId: int64(user.ID)})
 
-				require.NoError(f.T, err)
-				require.NotEmpty(f.T, resp.Message, "expected message in response")
+				s.Require().NoError(err)
+				s.Require().NotEmpty(resp.Message, "expected message in response")
 
 				// Verify user is actually deleted
 				_, verifyErr := f.GRPCClient.GetUser(ctxWithToken, &pb.GetUserRequest{UserId: int64(user.ID)})
-				require.Error(f.T, verifyErr, "expected error when getting deleted user")
+				s.Require().Error(verifyErr, "expected error when getting deleted user")
 
 				return nil
 			},
@@ -265,24 +275,29 @@ func TestDeleteUser(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			fixture := NewTestFixture(t)
+		s.Run(tt.Name, func() {
+			fixture := NewTestFixtureWithSuite(s)
 			fixture.Setup()
 
 			if err := tt.Setup(fixture); err != nil {
-				t.Fatalf("setup failed: %v", err)
+				s.T().Fatalf("setup failed: %v", err)
 			}
 
 			err := tt.Test(fixture)
 			if (err != nil) != tt.ExpectError {
-				t.Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
+				s.T().Errorf("test failed: got error %v, want error %v", err, tt.ExpectError)
 			}
 
 			if tt.Verify != nil {
 				if err := tt.Verify(fixture); err != nil {
-					t.Errorf("verification failed: %v", err)
+					s.T().Errorf("verification failed: %v", err)
 				}
 			}
 		})
 	}
+}
+
+// TestUserService runs the user management test suite
+func TestUserService(t *testing.T) {
+	suite.Run(t, new(UserTestSuite))
 }

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/repository"
@@ -13,14 +13,22 @@ import (
 	"github.com/arpansaha13/auth-system/internal/worker"
 )
 
-// CreateTestDB creates a test database connection using shared global resources
-func CreateTestDB(t *testing.T) *TestDB {
-	// Clean tables before test
-	CleanupTables(t)
+// AuthE2ETestSuite is a test suite for end-to-end auth flows
+type AuthE2ETestSuite struct {
+	BaseTestSuite
+}
 
+// SetupTest prepares each test
+func (s *AuthE2ETestSuite) SetupTest() {
+	s.CleanupTablesForSuite()
+}
+
+// CreateTestDB creates a test database connection using shared global resources
+func (s *AuthE2ETestSuite) CreateTestDB() *TestDB {
+	// Tables should already be cleaned by SetupTest
 	return &TestDB{
-		DB:  GetTestDB(),
-		Ctx: GetTestContext(),
+		DB:  s.DB,
+		Ctx: s.Ctx,
 	}
 }
 
@@ -51,8 +59,8 @@ func (tdb *TestDB) CreateAuthService() *service.AuthService {
 }
 
 // TestSignupFlow tests the complete signup flow
-func TestSignupFlow(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestSignupFlow() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -62,16 +70,16 @@ func TestSignupFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.NoError(t, err)
-	require.NotEmpty(t, signupResp.OTPHash, "Expected OTP hash in response")
-	require.NotEmpty(t, signupResp.Message, "Expected message in response")
+	s.Require().NoError(err)
+	s.Require().NotEmpty(signupResp.OTPHash, "Expected OTP hash in response")
+	s.Require().NotEmpty(signupResp.Message, "Expected message in response")
 
-	t.Logf("Signup successful: %s, OTP Hash: %s", signupResp.Message, signupResp.OTPHash)
+	s.T().Logf("Signup successful: %s, OTP Hash: %s", signupResp.Message, signupResp.OTPHash)
 }
 
 // TestSignupDuplicate tests duplicate email prevention
-func TestSignupDuplicate(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestSignupDuplicate() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -81,7 +89,7 @@ func TestSignupDuplicate(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Duplicate signup
 	_, err = authService.Signup(testdb.Ctx, service.SignupRequest{
@@ -89,15 +97,15 @@ func TestSignupDuplicate(t *testing.T) {
 		Password: "anotherPassword123",
 	})
 
-	require.Error(t, err, "Expected error for duplicate email")
-	require.True(t, domain.IsConflict(err), "Expected ConflictError")
+	s.Require().Error(err, "Expected error for duplicate email")
+	s.Require().True(domain.IsConflict(err), "Expected ConflictError")
 
-	t.Logf("Duplicate signup correctly prevented: %v", err)
+	s.T().Logf("Duplicate signup correctly prevented: %v", err)
 }
 
 // TestLoginBeforeVerification tests that login fails before email verification
-func TestLoginBeforeVerification(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestLoginBeforeVerification() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -107,7 +115,7 @@ func TestLoginBeforeVerification(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Try to login before verification
 	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
@@ -115,15 +123,15 @@ func TestLoginBeforeVerification(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.Error(t, err, "Expected error when logging in before email verification")
-	require.True(t, domain.IsUnauthorized(err), "Expected UnauthorizedError")
+	s.Require().Error(err, "Expected error when logging in before email verification")
+	s.Require().True(domain.IsUnauthorized(err), "Expected UnauthorizedError")
 
-	t.Logf("Login correctly blocked before verification: %v", err)
+	s.T().Logf("Login correctly blocked before verification: %v", err)
 }
 
 // TestCompleteAuthFlow tests the complete authentication flow
-func TestCompleteAuthFlow(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestCompleteAuthFlow() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 	otpRepo := repository.NewOTPRepository(testdb.DB)
@@ -134,21 +142,21 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	otpHash := signupResp.OTPHash
 
-	require.NotEmpty(t, otpHash, "Expected OTP hash in signup response")
+	s.Require().NotEmpty(otpHash, "Expected OTP hash in signup response")
 
 	// Step 2: Get OTP from database (simulate email)
 	_, err = otpRepo.GetByOTPHash(testdb.Ctx, otpHash, domain.OTPPurposeSignupVerification)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// For testing, we need to update the OTP code hash
 	hasher := utils.NewPasswordHasher()
 	testOTP := "123456"
 	hash, _ := hasher.Hash(testOTP)
-	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
+	s.Require().NoError(testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
 		Update("hashed_code", hash).Error)
 
@@ -158,11 +166,11 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Code:    testOTP,
 	})
 
-	require.NoError(t, err)
-	require.NotEmpty(t, verifyResp.SessionToken, "Expected session token in verification response")
-	require.NotEmpty(t, verifyResp.OTPHash, "Expected OTP hash in verification response")
+	s.Require().NoError(err)
+	s.Require().NotEmpty(verifyResp.SessionToken, "Expected session token in verification response")
+	s.Require().NotEmpty(verifyResp.OTPHash, "Expected OTP hash in verification response")
 
-	t.Logf("OTP verified, username: %s, OTP hash: %s", verifyResp.Username, verifyResp.OTPHash)
+	s.T().Logf("OTP verified, username: %s, OTP hash: %s", verifyResp.Username, verifyResp.OTPHash)
 
 	// Step 4: Login
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
@@ -170,23 +178,23 @@ func TestCompleteAuthFlow(t *testing.T) {
 		Password: "securePassword123",
 	})
 
-	require.NoError(t, err)
-	require.NotEmpty(t, loginResp.SessionToken, "Expected session token in login response")
+	s.Require().NoError(err)
+	s.Require().NotEmpty(loginResp.SessionToken, "Expected session token in login response")
 
 	// Step 5: Validate session
 	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
 
-	require.NoError(t, err)
-	require.True(t, validateResp.Valid, "Expected session to be valid")
+	s.Require().NoError(err)
+	s.Require().True(validateResp.Valid, "Expected session to be valid")
 
-	t.Log("Complete auth flow successful")
+	s.T().Log("Complete auth flow successful")
 }
 
 // TestSessionRefresh tests session refresh
-func TestSessionRefresh(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestSessionRefresh() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -195,7 +203,7 @@ func TestSessionRefresh(t *testing.T) {
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	otpHash := signupResp.OTPHash
 
@@ -203,7 +211,7 @@ func TestSessionRefresh(t *testing.T) {
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
 	otpHashCode, _ := hasher.Hash(testOTP)
-	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
+	s.Require().NoError(testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
 		Update("hashed_code", otpHashCode).Error)
 
@@ -211,14 +219,14 @@ func TestSessionRefresh(t *testing.T) {
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Login to get a valid session token
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "refresh-test@example.com",
 		Password: "password123",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	oldToken := loginResp.SessionToken
 
@@ -227,16 +235,16 @@ func TestSessionRefresh(t *testing.T) {
 		Token: oldToken,
 	})
 
-	require.NoError(t, err)
-	require.NotEmpty(t, refreshResp.NewSessionToken, "Expected new session token")
-	require.NotEqual(t, oldToken, refreshResp.NewSessionToken, "Expected different token after refresh")
+	s.Require().NoError(err)
+	s.Require().NotEmpty(refreshResp.NewSessionToken, "Expected new session token")
+	s.Require().NotEqual(oldToken, refreshResp.NewSessionToken, "Expected different token after refresh")
 
-	t.Log("Session refresh successful")
+	s.T().Log("Session refresh successful")
 }
 
 // TestLogout tests the logout functionality
-func TestLogout(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestLogout() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -245,7 +253,7 @@ func TestLogout(t *testing.T) {
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	otpHash := signupResp.OTPHash
 
@@ -253,7 +261,7 @@ func TestLogout(t *testing.T) {
 	testOTP := "123456"
 	hasher := utils.NewPasswordHasher()
 	otpHashCode, _ := hasher.Hash(testOTP)
-	require.NoError(t, testdb.DB.Model(&domain.OTP{}).
+	s.Require().NoError(testdb.DB.Model(&domain.OTP{}).
 		Where("otp_hash = ?", otpHash).
 		Update("hashed_code", otpHashCode).Error)
 
@@ -262,42 +270,42 @@ func TestLogout(t *testing.T) {
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Step 4: Login
 	loginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "logout-test@example.com",
 		Password: "password123",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Step 5: Verify session is valid before logout
 	validateResp, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
-	require.NoError(t, err)
-	require.True(t, validateResp.Valid, "Expected session to be valid before logout")
+	s.Require().NoError(err)
+	s.Require().True(validateResp.Valid, "Expected session to be valid before logout")
 
 	// Step 6: Logout
 	logoutResp, err := authService.Logout(testdb.Ctx, service.LogoutRequest{
 		Token: loginResp.SessionToken,
 	})
-	require.NoError(t, err)
-	require.Equal(t, "logout successful", logoutResp.Message)
+	s.Require().NoError(err)
+	s.Require().Equal("logout successful", logoutResp.Message)
 
 	// Step 7: Verify session is invalid after logout
 	validateAfterLogout, err := authService.ValidateSession(testdb.Ctx, service.ValidateSessionRequest{
 		Token: loginResp.SessionToken,
 	})
-	require.NoError(t, err)
-	require.False(t, validateAfterLogout.Valid, "Expected session to be invalid after logout")
+	s.Require().NoError(err)
+	s.Require().False(validateAfterLogout.Valid, "Expected session to be invalid after logout")
 
-	t.Log("Logout successful and session invalidated")
+	s.T().Log("Logout successful and session invalidated")
 }
 
 // TestForgotAndResetPasswordFlow tests the complete forgot and reset password flow
-func TestForgotAndResetPasswordFlow(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestForgotAndResetPasswordFlow() {
+	testdb := s.CreateTestDB()
 	authService := testdb.CreateAuthService()
 	otpRepo := repository.NewOTPRepository(testdb.DB)
 
@@ -306,7 +314,7 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		Email:    "reset-flow@example.com",
 		Password: "oldPassword123",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	otpHash := signupResp.OTPHash
 
@@ -323,16 +331,16 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		OTPHash: otpHash,
 		Code:    testOTP,
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Step 2: Initiate forgot password
 	forgotResp, err := authService.ForgotPassword(testdb.Ctx, service.ForgotPasswordRequest{
 		Email: "reset-flow@example.com",
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	forgotOTPHash := forgotResp.OTPHash
-	require.NotEmpty(t, forgotOTPHash, "Expected OTP hash from forgot password")
+	s.Require().NotEmpty(forgotOTPHash, "Expected OTP hash from forgot password")
 
 	// Step 3: Get the OTP and prepare for reset
 	forgotOTP := "654321" // Different OTP
@@ -347,35 +355,35 @@ func TestForgotAndResetPasswordFlow(t *testing.T) {
 		Code:     forgotOTP,
 		Password: "newPassword123",
 	})
-	require.NoError(t, err)
-	require.Equal(t, "password reset successfully", resetResp.Message)
+	s.Require().NoError(err)
+	s.Require().Equal("password reset successfully", resetResp.Message)
 
 	// Step 5: Verify old password no longer works
 	_, err = authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "reset-flow@example.com",
 		Password: "oldPassword123",
 	})
-	require.Error(t, err, "Expected login to fail with old password")
+	s.Require().Error(err, "Expected login to fail with old password")
 
 	// Step 6: Verify new password works
 	newLoginResp, err := authService.Login(testdb.Ctx, service.LoginRequest{
 		Email:    "reset-flow@example.com",
 		Password: "newPassword123",
 	})
-	require.NoError(t, err)
-	require.NotEmpty(t, newLoginResp.SessionToken, "Expected session token from new login")
+	s.Require().NoError(err)
+	s.Require().NotEmpty(newLoginResp.SessionToken, "Expected session token from new login")
 
 	// Step 7: Verify OTP is soft-deleted after reset
 	_, err = otpRepo.GetByOTPHash(testdb.Ctx, forgotOTPHash, domain.OTPPurposeResetPassword)
-	require.Error(t, err, "Expected OTP to be soft-deleted after reset")
+	s.Require().Error(err, "Expected OTP to be soft-deleted after reset")
 
-	t.Log("Complete forgot and reset password flow successful")
+	s.T().Log("Complete forgot and reset password flow successful")
 }
 
 // TestLogoutInvalidToken tests logout with an invalid token
 // TestLogoutInvalidToken tests logout with an invalid token
-func TestLogoutInvalidToken(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestLogoutInvalidToken() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -384,15 +392,15 @@ func TestLogoutInvalidToken(t *testing.T) {
 		Token: "invalid-token",
 	})
 
-	require.Error(t, err, "Expected error for invalid token")
-	require.True(t, domain.IsNotFound(err), "Expected NotFoundError")
+	s.Require().Error(err, "Expected error for invalid token")
+	s.Require().True(domain.IsNotFound(err), "Expected NotFoundError")
 
-	t.Log("Invalid token logout properly rejected")
+	s.T().Log("Invalid token logout properly rejected")
 }
 
 // TestLogoutEmptyToken tests logout with empty token
-func TestLogoutEmptyToken(t *testing.T) {
-	testdb := CreateTestDB(t)
+func (s *AuthE2ETestSuite) TestLogoutEmptyToken() {
+	testdb := s.CreateTestDB()
 
 	authService := testdb.CreateAuthService()
 
@@ -401,8 +409,13 @@ func TestLogoutEmptyToken(t *testing.T) {
 		Token: "",
 	})
 
-	require.Error(t, err, "Expected error for empty token")
-	require.True(t, domain.IsUnauthorized(err), "Expected UnauthorizedError")
+	s.Require().Error(err, "Expected error for empty token")
+	s.Require().True(domain.IsUnauthorized(err), "Expected UnauthorizedError")
 
-	t.Log("Empty token logout properly rejected")
+	s.T().Log("Empty token logout properly rejected")
+}
+
+// TestAuthE2E runs the end-to-end authentication test suite
+func TestAuthE2E(t *testing.T) {
+	suite.Run(t, new(AuthE2ETestSuite))
 }
