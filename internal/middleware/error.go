@@ -3,13 +3,14 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"log"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/arpansaha13/auth-system/internal/domain"
+	"github.com/arpansaha13/gotoolkit/logger"
 )
 
 // ErrorInterceptor is a middleware that catches errors and translates custom exceptions to gRPC status codes
@@ -18,7 +19,8 @@ func ErrorInterceptor() grpc.UnaryServerInterceptor {
 		resp, err := handler(ctx, req)
 
 		if err != nil {
-			log.Printf("error in %s: %v", info.FullMethod, err)
+			lgr := logger.FromContext(ctx)
+			lgr.Error("grpc error", zap.String("method", info.FullMethod), zap.Error(err))
 			return nil, errorToGRPCError(err)
 		}
 

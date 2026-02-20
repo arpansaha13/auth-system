@@ -4,13 +4,14 @@ import (
 	"context"
 	"log"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/arpansaha13/auth-system/internal/domain"
 	"github.com/arpansaha13/auth-system/internal/service"
 	"github.com/arpansaha13/auth-system/internal/utils"
 	"github.com/arpansaha13/auth-system/pb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // AuthServiceImpl implements the gRPC AuthService

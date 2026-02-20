@@ -1,4 +1,4 @@
-package main
+package grpc
 
 import (
 	"flag"
@@ -9,16 +9,17 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/arpansaha13/auth-system/internal/config"
-	"github.com/arpansaha13/auth-system/internal/controller"
-	"github.com/arpansaha13/auth-system/internal/middleware"
-	"github.com/arpansaha13/auth-system/internal/repository"
-	"github.com/arpansaha13/auth-system/internal/service"
-	"github.com/arpansaha13/auth-system/internal/utils"
-	"github.com/arpansaha13/auth-system/internal/worker"
 	"github.com/arpansaha13/auth-system/pb"
+	"github.com/arpansaha13/auth-system/pkg/config"
+	grpccontroller "github.com/arpansaha13/auth-system/pkg/controller/grpc"
+	grpcmiddleware "github.com/arpansaha13/auth-system/pkg/middleware/grpc"
+	"github.com/arpansaha13/auth-system/pkg/repository"
+	"github.com/arpansaha13/auth-system/pkg/service"
+	"github.com/arpansaha13/auth-system/pkg/utils"
+	"github.com/arpansaha13/auth-system/pkg/worker"
 )
 
 var (
@@ -28,13 +29,21 @@ var (
 func main() {
 	flag.Parse()
 
+	// Initialize zap logger
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalf("failed to initialize zap logger: %v", err)
+	}
+	defer zapLogger.Sync()
+	zap.ReplaceGlobals(zapLogger)
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	log.Printf("Starting auth service in %s environment", cfg.Environment)
+	log.Printf("Starting auth service (gRPC) in %s environment", cfg.Environment)
 
 	// Initialize database
 	db, err := utils.InitDB(cfg.DatabaseURL)
@@ -92,52 +101,38 @@ func main() {
 			EmailPool:  emailPool,
 		},
 	)
-	defer emailPool.Stop()
 
-	// Initialize cleanup worker
-	cleanupWorker := worker.NewCleanupWorker(
-		sessionRepo,
-		otpRepo,
-		cfg.SessionCleanupInterval,
-	)
-	cleanupWorker.Start()
-	defer cleanupWorker.Stop()
+	// Create gRPC server
+	opts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(grpcmiddleware.ErrorInterceptor()),
+	}
+	grpcServer := grpc.NewServer(opts...)
 
-	// Initialize gRPC server
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.ChainUnaryInterceptors(
-			middleware.ErrorInterceptor(),
-			middleware.RecoveryInterceptor(),
-			middleware.LoggingInterceptor(),
-			middleware.AuthorizationInterceptor(),
-		)),
-	)
+	// Register services
+	authController := grpccontroller.NewAuthServiceImpl(authService, validator)
 
-	// Register auth service
-	authServiceImpl := controller.NewAuthServiceImpl(authService, validator)
-	pb.RegisterAuthServiceServer(grpcServer, authServiceImpl)
+	pb.RegisterAuthServiceServer(grpcServer, authController)
 
-	// Listen on port
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", cfg.GRPCHost, cfg.GRPCPort))
+	// Start gRPC server
+	grpcPort := fmt.Sprintf("%s:%s", cfg.GRPCHost, cfg.GRPCPort)
+	listener, err := net.Listen("tcp", grpcPort)
 	if err != nil {
-		log.Fatalf("Failed to listen on %s:%s: %v", cfg.GRPCHost, cfg.GRPCPort, err)
+		log.Fatalf("Failed to listen on %s: %v", grpcPort, err)
 	}
 
-	// Start server in a goroutine
 	go func() {
-		log.Printf("Starting gRPC server on %s:%s", cfg.GRPCHost, cfg.GRPCPort)
-		if err := grpcServer.Serve(lis); err != nil {
+		log.Printf("Starting gRPC server on %s", grpcPort)
+		if err := grpcServer.Serve(listener); err != nil {
 			log.Fatalf("gRPC server error: %v", err)
 		}
 	}()
 
-	// Handle graceful shutdown
+	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-	log.Println("Shutdown signal received, gracefully shutting down...")
 
+	log.Println("Shutting down gRPC server...")
 	grpcServer.GracefulStop()
 	log.Println("gRPC server stopped")
 }

@@ -2,13 +2,15 @@ package middleware
 
 import (
 	"context"
-	"log"
 	"strings"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/arpansaha13/gotoolkit/logger"
 )
 
 // AuthorizationInterceptor intercepts gRPC requests to validate session tokens
@@ -38,7 +40,8 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("panic recovered in %s: %v", info.FullMethod, r)
+				lgr := logger.FromContext(ctx)
+				lgr.Error("panic recovered", zap.Any("panic_value", r), zap.String("method", info.FullMethod))
 				err = status.Error(codes.Internal, "internal server error")
 			}
 		}()
@@ -47,19 +50,17 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// LoggingInterceptor logs gRPC method calls
+// LoggingInterceptor logs gRPC method calls using the gotoolkit logger.
+// Deprecated: Use logger.UnaryServerInterceptor() from gotoolkit instead.
 func LoggingInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		log.Printf("gRPC method called: %s", info.FullMethod)
+	// Delegate to the gotoolkit logger interceptor
+	return logger.UnaryServerInterceptor()
+}
 
-		resp, err := handler(ctx, req)
-
-		if err != nil {
-			log.Printf("gRPC method %s returned error: %v", info.FullMethod, err)
-		}
-
-		return resp, err
-	}
+// GrpcLoggingInterceptor is an alias for the high-observability gRPC logging interceptor.
+// Use this for new code.
+func GrpcLoggingInterceptor() grpc.UnaryServerInterceptor {
+	return logger.UnaryServerInterceptor()
 }
 
 // Private helper functions
