@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/domain"
 )
 
 // IUserRepository defines the interface for user repository operations

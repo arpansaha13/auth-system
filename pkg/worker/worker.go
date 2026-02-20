@@ -1,7 +1,7 @@
 // Package worker re-exports auth system workers
 package worker
 
-import iworker "github.com/arpansaha13/auth-system/internal/worker"
+import iworker "github.com/arpansaha13/goauthkit/internal/worker"
 
 // Interfaces
 type EmailProvider = iworker.EmailProvider

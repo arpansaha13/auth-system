@@ -6,6 +6,7 @@
     "bcrypt",
     "dbname",
     "dotenv",
+    "goauthkit",
     "golang",
     "gorm",
     "goroutine",

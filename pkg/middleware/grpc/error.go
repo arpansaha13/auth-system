@@ -3,7 +3,7 @@ package grpc
 import (
 	"google.golang.org/grpc"
 
-	imw "github.com/arpansaha13/auth-system/internal/middleware"
+	imw "github.com/arpansaha13/goauthkit/internal/middleware"
 )
 
 func ErrorInterceptor() grpc.UnaryServerInterceptor {

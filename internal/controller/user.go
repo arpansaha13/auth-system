@@ -4,9 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/service"
-	"github.com/arpansaha13/auth-system/pb"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/service"
+	"github.com/arpansaha13/goauthkit/pb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

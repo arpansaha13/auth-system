@@ -1,4 +1,4 @@
-module github.com/arpansaha13/auth-system
+module github.com/arpansaha13/goauthkit
 
 go 1.25.6
 

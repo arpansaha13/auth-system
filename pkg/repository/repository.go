@@ -3,7 +3,7 @@ package repository
 import (
 	"gorm.io/gorm"
 
-	irepo "github.com/arpansaha13/auth-system/internal/repository"
+	irepo "github.com/arpansaha13/goauthkit/internal/repository"
 )
 
 // Interfaces

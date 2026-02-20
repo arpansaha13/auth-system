@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/repository"
-	"github.com/arpansaha13/auth-system/internal/utils"
-	"github.com/arpansaha13/auth-system/internal/worker"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/repository"
+	"github.com/arpansaha13/goauthkit/internal/utils"
+	"github.com/arpansaha13/goauthkit/internal/worker"
 )
 
 // AuthService handles authentication and session management business logic.

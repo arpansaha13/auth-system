@@ -3,7 +3,7 @@ package utils
 import (
 	"gorm.io/gorm"
 
-	utils_internal "github.com/arpansaha13/auth-system/internal/utils"
+	utils_internal "github.com/arpansaha13/goauthkit/internal/utils"
 )
 
 type PasswordHasher = utils_internal.PasswordHasher

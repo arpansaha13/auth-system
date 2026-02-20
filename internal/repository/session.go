@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/domain"
 )
 
 // SessionRepository handles session-related database operations

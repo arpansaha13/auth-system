@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/arpansaha13/auth-system/pkg/config"
-	"github.com/arpansaha13/auth-system/pkg/repository"
-	"github.com/arpansaha13/auth-system/pkg/service"
-	"github.com/arpansaha13/auth-system/pkg/utils"
-	"github.com/arpansaha13/auth-system/pkg/worker"
+	"github.com/arpansaha13/goauthkit/pkg/config"
+	"github.com/arpansaha13/goauthkit/pkg/repository"
+	"github.com/arpansaha13/goauthkit/pkg/service"
+	"github.com/arpansaha13/goauthkit/pkg/utils"
+	"github.com/arpansaha13/goauthkit/pkg/worker"
 	"go.uber.org/zap"
 )
 

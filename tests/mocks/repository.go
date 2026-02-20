@@ -3,7 +3,7 @@ package mocks
 import (
 	"context"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/domain"
 )
 
 // MockUserRepository is a mock implementation of IUserRepository

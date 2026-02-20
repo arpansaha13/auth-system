@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/domain"
 )
 
 // GetUserRequest represents get user input with user ID

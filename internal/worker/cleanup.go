@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/arpansaha13/auth-system/internal/repository"
+	"github.com/arpansaha13/goauthkit/internal/repository"
 )
 
 // CleanupWorker handles periodic cleanup tasks

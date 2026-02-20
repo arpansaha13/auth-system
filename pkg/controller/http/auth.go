@@ -1,4 +1,4 @@
-// Package controller provides HTTP controllers for auth-system
+// Package controller provides HTTP controllers for goauthkit
 package http
 
 // HTTPAuthController handles HTTP auth requests

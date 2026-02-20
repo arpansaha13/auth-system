@@ -8,10 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/service"
-	"github.com/arpansaha13/auth-system/internal/utils"
-	"github.com/arpansaha13/auth-system/pb"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/service"
+	"github.com/arpansaha13/goauthkit/internal/utils"
+	"github.com/arpansaha13/goauthkit/pb"
 )
 
 // AuthServiceImpl implements the gRPC AuthService

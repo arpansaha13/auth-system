@@ -3,7 +3,7 @@ package mocks
 import (
 	"context"
 
-	"github.com/arpansaha13/auth-system/internal/service"
+	"github.com/arpansaha13/goauthkit/internal/service"
 )
 
 // MockAuthService mocks the auth service for controller tests

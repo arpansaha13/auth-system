@@ -17,11 +17,11 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	pkgrepo "github.com/arpansaha13/auth-system/pkg/repository"
-	pkgservice "github.com/arpansaha13/auth-system/pkg/service"
-	pkgutils "github.com/arpansaha13/auth-system/pkg/utils"
-	pkgworker "github.com/arpansaha13/auth-system/pkg/worker"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	pkgrepo "github.com/arpansaha13/goauthkit/pkg/repository"
+	pkgservice "github.com/arpansaha13/goauthkit/pkg/service"
+	pkgutils "github.com/arpansaha13/goauthkit/pkg/utils"
+	pkgworker "github.com/arpansaha13/goauthkit/pkg/worker"
 )
 
 // HTTPPlaygroundTestSuite tests the HTTP playground server using pkg exports

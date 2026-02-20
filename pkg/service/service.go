@@ -2,9 +2,9 @@
 package service
 
 import (
-	irepo "github.com/arpansaha13/auth-system/internal/repository"
-	isvc "github.com/arpansaha13/auth-system/internal/service"
-	iutil "github.com/arpansaha13/auth-system/internal/utils"
+	irepo "github.com/arpansaha13/goauthkit/internal/repository"
+	isvc "github.com/arpansaha13/goauthkit/internal/service"
+	iutil "github.com/arpansaha13/goauthkit/internal/utils"
 )
 
 // Interfaces

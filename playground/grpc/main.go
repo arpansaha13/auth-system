@@ -12,14 +12,14 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/arpansaha13/auth-system/pb"
-	"github.com/arpansaha13/auth-system/pkg/config"
-	grpccontroller "github.com/arpansaha13/auth-system/pkg/controller/grpc"
-	grpcmiddleware "github.com/arpansaha13/auth-system/pkg/middleware/grpc"
-	"github.com/arpansaha13/auth-system/pkg/repository"
-	"github.com/arpansaha13/auth-system/pkg/service"
-	"github.com/arpansaha13/auth-system/pkg/utils"
-	"github.com/arpansaha13/auth-system/pkg/worker"
+	"github.com/arpansaha13/goauthkit/pb"
+	"github.com/arpansaha13/goauthkit/pkg/config"
+	grpccontroller "github.com/arpansaha13/goauthkit/pkg/controller/grpc"
+	grpcmiddleware "github.com/arpansaha13/goauthkit/pkg/middleware/grpc"
+	"github.com/arpansaha13/goauthkit/pkg/repository"
+	"github.com/arpansaha13/goauthkit/pkg/service"
+	"github.com/arpansaha13/goauthkit/pkg/utils"
+	"github.com/arpansaha13/goauthkit/pkg/worker"
 )
 
 var (

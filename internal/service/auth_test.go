@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/service"
-	"github.com/arpansaha13/auth-system/internal/utils"
-	"github.com/arpansaha13/auth-system/internal/worker"
-	"github.com/arpansaha13/auth-system/tests/mocks"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/service"
+	"github.com/arpansaha13/goauthkit/internal/utils"
+	"github.com/arpansaha13/goauthkit/internal/worker"
+	"github.com/arpansaha13/goauthkit/tests/mocks"
 )
 
 // MockEmailProvider is a test implementation of EmailProvider

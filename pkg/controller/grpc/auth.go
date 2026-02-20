@@ -1,10 +1,10 @@
-// Package controller provides gRPC controllers for auth-system
+// Package controller provides gRPC controllers for goauthkit
 package grpc
 
 import (
-	ictl "github.com/arpansaha13/auth-system/internal/controller"
-	"github.com/arpansaha13/auth-system/pkg/service"
-	"github.com/arpansaha13/auth-system/pkg/utils"
+	ictl "github.com/arpansaha13/goauthkit/internal/controller"
+	"github.com/arpansaha13/goauthkit/pkg/service"
+	"github.com/arpansaha13/goauthkit/pkg/utils"
 )
 
 // Controller implementations

@@ -17,14 +17,14 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/arpansaha13/auth-system/internal/domain"
-	"github.com/arpansaha13/auth-system/internal/middleware"
-	"github.com/arpansaha13/auth-system/pb"
-	grpccontroller "github.com/arpansaha13/auth-system/pkg/controller/grpc"
-	pkgrepo "github.com/arpansaha13/auth-system/pkg/repository"
-	pkgservice "github.com/arpansaha13/auth-system/pkg/service"
-	pkgutils "github.com/arpansaha13/auth-system/pkg/utils"
-	pkgworker "github.com/arpansaha13/auth-system/pkg/worker"
+	"github.com/arpansaha13/goauthkit/internal/domain"
+	"github.com/arpansaha13/goauthkit/internal/middleware"
+	"github.com/arpansaha13/goauthkit/pb"
+	grpccontroller "github.com/arpansaha13/goauthkit/pkg/controller/grpc"
+	pkgrepo "github.com/arpansaha13/goauthkit/pkg/repository"
+	pkgservice "github.com/arpansaha13/goauthkit/pkg/service"
+	pkgutils "github.com/arpansaha13/goauthkit/pkg/utils"
+	pkgworker "github.com/arpansaha13/goauthkit/pkg/worker"
 )
 
 // GRPCPlaygroundTestSuite tests the gRPC playground server using pkg exports
