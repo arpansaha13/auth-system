@@ -1,22 +1,21 @@
 package utils
 
 import (
-	"log"
-
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 // InitDB initializes a database connection
 func InitDB(dsn string) (*gorm.DB, error) {
-	log.Println("connecting to database...")
+	zap.L().Info("connecting to database")
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("database connected successfully")
+	zap.L().Info("database connected successfully")
 	return db, nil
 }
 

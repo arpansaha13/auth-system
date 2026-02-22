@@ -3,8 +3,9 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/smtp"
+
+	"go.uber.org/zap"
 )
 
 // SMTPEmailProvider implements EmailProvider using SMTP
@@ -78,7 +79,7 @@ func (p *MockEmailProvider) SendEmail(ctx context.Context, email, subject, body 
 	}
 	p.sentEmails = append(p.sentEmails, sentEmail)
 
-	log.Printf("[MOCK EMAIL] To: %s, Subject: %s, Body: %s", email, subject, body)
+	zap.L().Info("mock email sent", zap.String("to", email), zap.String("subject", subject))
 
 	return nil
 }

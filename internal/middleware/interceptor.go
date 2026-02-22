@@ -50,18 +50,6 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// LoggingInterceptor logs gRPC method calls using the gotoolkit logger.
-// Deprecated: Use logger.UnaryServerInterceptor() from gotoolkit instead.
-func LoggingInterceptor() grpc.UnaryServerInterceptor {
-	// Delegate to the gotoolkit logger interceptor
-	return logger.UnaryServerInterceptor()
-}
-
-// GrpcLoggingInterceptor is an alias for the high-observability gRPC logging interceptor.
-// Use this for new code.
-func GrpcLoggingInterceptor() grpc.UnaryServerInterceptor {
-	return logger.UnaryServerInterceptor()
-}
 
 // Private helper functions
 

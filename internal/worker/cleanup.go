@@ -2,8 +2,9 @@ package worker
 
 import (
 	"context"
-	"log"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/arpansaha13/goauthkit/internal/repository"
 )
@@ -32,7 +33,7 @@ func NewCleanupWorker(
 
 // Start starts the cleanup worker
 func (w *CleanupWorker) Start() {
-	log.Printf("starting cleanup worker with interval: %v", w.interval)
+	zap.L().Info("starting cleanup worker", zap.Duration("interval", w.interval))
 
 	go func() {
 		ticker := time.NewTicker(w.interval)
@@ -43,7 +44,7 @@ func (w *CleanupWorker) Start() {
 			case <-ticker.C:
 				w.cleanup()
 			case <-w.stopChan:
-				log.Println("stopping cleanup worker")
+				zap.L().Info("stopping cleanup worker")
 				return
 			}
 		}
@@ -62,15 +63,15 @@ func (w *CleanupWorker) cleanup() {
 
 	// Clean up expired sessions
 	if err := w.sessionRepo.DeleteExpiredAndSoftDeleted(ctx); err != nil {
-		log.Printf("failed to delete expired sessions: %v", err)
+		zap.L().Error("failed to delete expired sessions", zap.Error(err))
 	} else {
-		log.Println("expired sessions cleaned up")
+		zap.L().Info("expired sessions cleaned up")
 	}
 
 	// Clean up expired OTPs
 	if err := w.otpRepo.DeleteExpiredAndSoftDeleted(ctx); err != nil {
-		log.Printf("failed to delete expired otps: %v", err)
+		zap.L().Error("failed to delete expired otps", zap.Error(err))
 	} else {
-		log.Println("expired otps cleaned up")
+		zap.L().Info("expired otps cleaned up")
 	}
 }
