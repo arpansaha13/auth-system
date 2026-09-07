@@ -12,6 +12,7 @@ import (
 	"github.com/arpansaha13/goauthkit/domain"
 	"github.com/arpansaha13/goauthkit/service"
 	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/httpx"
 )
 
 // ProviderConfig holds configuration for an OAuth2/OIDC provider
@@ -45,7 +46,7 @@ func NewOAuthController(
 }
 
 // Login initiates the OAuth flow.
-func (c *OAuthController) Login(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *OAuthController) Login(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	ctx := r.Context()
 	provider, err := oidc.NewProvider(ctx, c.providerCfg.Issuer)
 	if err != nil {
@@ -69,14 +70,14 @@ func (c *OAuthController) Login(w http.ResponseWriter, r *http.Request) (*gtk.Co
 
 	authURL := config.AuthCodeURL(state, oidc.Nonce(nonce))
 
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusFound,
 		Headers:    map[string]string{"Location": authURL},
 	}, nil
 }
 
 // Callback handles the OAuth callback.
-func (c *OAuthController) Callback(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *OAuthController) Callback(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	ctx := r.Context()
 
 	// Validate state
@@ -124,7 +125,7 @@ func (c *OAuthController) Callback(w http.ResponseWriter, r *http.Request) (*gtk
 	if err != nil {
 		if gtk.IsConflict(err) {
 			// Redirect to frontend login with error param
-			return &gtk.ControllerResponse{
+			return &httpx.ControllerResponse{
 				StatusCode: http.StatusFound,
 				Headers:    map[string]string{"Location": "/auth/login?error=account_exists"},
 			}, nil
@@ -140,7 +141,7 @@ func (c *OAuthController) Callback(w http.ResponseWriter, r *http.Request) (*gtk
 	setSessionCookie(w, c.cookieConfig, resp.SessionToken, resp.ExpiresAt)
 
 	// Redirect to frontend home or dashboard
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusFound,
 		Headers:    map[string]string{"Location": "/"},
 	}, nil

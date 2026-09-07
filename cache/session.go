@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/memcached"
 	"github.com/bradfitz/gomemcache/memcache"
 
 	"github.com/arpansaha13/goauthkit/domain"
@@ -16,12 +17,12 @@ import (
 // MemcachedSessionCache implements ISessionCache using memcached as the backend.
 // Circuit protection lives on the memcached client.
 type MemcachedSessionCache struct {
-	client *gtk.MemcachedClient
+	client *memcached.MemcachedClient
 }
 
 // NewMemcachedSessionCache creates a new session cache with a memcached client wrapper.
 // If client is nil, operations become no-ops (graceful degradation).
-func NewMemcachedSessionCache(client *gtk.MemcachedClient) *MemcachedSessionCache {
+func NewMemcachedSessionCache(client *memcached.MemcachedClient) *MemcachedSessionCache {
 	return &MemcachedSessionCache{client: client}
 }
 

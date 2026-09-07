@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/grpcx"
+	"github.com/arpansaha13/gotoolkit/httpx"
+	"github.com/arpansaha13/gotoolkit/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sony/gobreaker/v2"
 	"github.com/stretchr/testify/suite"
@@ -70,7 +72,7 @@ func (s *AuthIntegrationTestSuite) SetupSuite() {
 	port, _ := container.MappedPort(ctx, "5432")
 	dsn := fmt.Sprintf("postgres://testuser:testpass@%s:%s/test_auth_integration?sslmode=disable", host, port.Port())
 
-	pg := gtk.NewPostgresClient(ctx, gtk.PostgresClientConfig{DatabaseURL: dsn})
+	pg := postgres.NewPostgresClient(ctx, postgres.PostgresClientConfig{DatabaseURL: dsn})
 	s.Require().NoError(pg.Start(), "Failed to connect to database")
 	s.DB = pg.Pool()
 
@@ -141,13 +143,13 @@ func (s *AuthIntegrationTestSuite) setupHTTPServer() {
 	authCtrl := controller.NewAuthController(s.AuthService, validator, cookieConfig)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/auth/signup", gtk.HttpControllerAdaptor(authCtrl.Signup))
-	mux.HandleFunc("POST /api/auth/login", gtk.HttpControllerAdaptor(authCtrl.Login))
-	mux.HandleFunc("POST /api/auth/verify", gtk.HttpControllerAdaptor(authCtrl.VerifyOTP))
-	mux.HandleFunc("POST /api/auth/logout", gtk.HttpControllerAdaptor(authCtrl.Logout))
+	mux.HandleFunc("POST /api/auth/signup", httpx.HttpControllerAdaptor(authCtrl.Signup))
+	mux.HandleFunc("POST /api/auth/login", httpx.HttpControllerAdaptor(authCtrl.Login))
+	mux.HandleFunc("POST /api/auth/verify", httpx.HttpControllerAdaptor(authCtrl.VerifyOTP))
+	mux.HandleFunc("POST /api/auth/logout", httpx.HttpControllerAdaptor(authCtrl.Logout))
 
 	// Wrap mux with middlewares
-	handler := TokenExtractionMiddleware(cookieConfig.Name)(gtk.HttpRecoveryMiddleware(gtk.HttpErrorMiddleware(mux)))
+	handler := TokenExtractionMiddleware(cookieConfig.Name)(httpx.HttpRecoveryMiddleware(httpx.HttpErrorMiddleware(mux)))
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	s.Require().NoError(err)
@@ -164,8 +166,8 @@ func (s *AuthIntegrationTestSuite) setupGRPCServer() {
 
 	s.GRPCServer = grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.ChainUnaryInterceptors(
-			gtk.GrpcErrorInterceptor(),
-			gtk.GrpcRecoveryInterceptor(),
+			grpcx.GrpcErrorInterceptor(),
+			grpcx.GrpcRecoveryInterceptor(),
 			middleware.AuthorizationInterceptor(),
 		)),
 	)

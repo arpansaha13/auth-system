@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/postgres"
 	"github.com/sony/gobreaker/v2"
 
 	"github.com/arpansaha13/goauthkit/domain"
 )
 
 type OTPRepository struct {
-	db *gtk.PostgresClient
+	db *postgres.PostgresClient
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewOTPRepository(db *gtk.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *OTPRepository {
+func NewOTPRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *OTPRepository {
 	return &OTPRepository{db: db, cb: cb}
 }
 
@@ -47,7 +48,7 @@ func (r *OTPRepository) GetByUserIDAndPurpose(ctx context.Context, userID int64,
 func (r *OTPRepository) getOTP(ctx context.Context, query string, arg1 any, purpose domain.OTPPurpose) (*domain.OTP, error) {
 	result, err := r.cb.Execute(func() (any, error) {
 		var otp domain.OTP
-		err := gtk.MapNoRows(r.db.QueryRow(ctx, query, arg1, purpose).Scan(
+		err := postgres.MapNoRows(r.db.QueryRow(ctx, query, arg1, purpose).Scan(
 			&otp.ID, &otp.UserID, &otp.OTPHash, &otp.HashedCode, &otp.Purpose, &otp.ExpiresAt, &otp.DeletedAt, &otp.CreatedAt,
 		))
 		if err != nil {
@@ -56,7 +57,7 @@ func (r *OTPRepository) getOTP(ctx context.Context, query string, arg1 any, purp
 		return &otp, nil
 	})
 	if err != nil {
-		if errors.Is(err, &gtk.RecordNotFoundError{}) {
+		if errors.Is(err, &postgres.RecordNotFoundError{}) {
 			return nil, &gtk.NotFoundError{Message: "otp not found"}
 		}
 		return nil, &gtk.InternalError{Message: "failed to get otp", Err: err}

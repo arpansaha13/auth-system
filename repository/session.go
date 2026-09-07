@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/postgres"
 	"github.com/sony/gobreaker/v2"
 
 	"github.com/arpansaha13/goauthkit/domain"
 )
 
 type SessionRepository struct {
-	db *gtk.PostgresClient
+	db *postgres.PostgresClient
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewSessionRepository(db *gtk.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *SessionRepository {
+func NewSessionRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *SessionRepository {
 	return &SessionRepository{db: db, cb: cb}
 }
 
@@ -35,7 +36,7 @@ func (r *SessionRepository) Create(ctx context.Context, session *domain.Session)
 func (r *SessionRepository) GetByTokenHash(ctx context.Context, tokenHash string) (*domain.Session, error) {
 	result, err := r.cb.Execute(func() (any, error) {
 		var session domain.Session
-		err := gtk.MapNoRows(r.db.QueryRow(ctx, `
+		err := postgres.MapNoRows(r.db.QueryRow(ctx, `
 			SELECT id, user_id, token_hash, expires_at, deleted_at, created_at
 			FROM sessions WHERE token_hash = $1 AND deleted_at IS NULL`, tokenHash,
 		).Scan(&session.ID, &session.UserID, &session.TokenHash, &session.ExpiresAt, &session.DeletedAt, &session.CreatedAt))
@@ -45,7 +46,7 @@ func (r *SessionRepository) GetByTokenHash(ctx context.Context, tokenHash string
 		return &session, nil
 	})
 	if err != nil {
-		if errors.Is(err, &gtk.RecordNotFoundError{}) {
+		if errors.Is(err, &postgres.RecordNotFoundError{}) {
 			return nil, &gtk.NotFoundError{Message: "session not found"}
 		}
 		return nil, &gtk.InternalError{Message: "failed to get session", Err: err}
@@ -129,13 +130,13 @@ func (r *SessionRepository) IsTokenValid(ctx context.Context, tokenHash string) 
 
 	res, err := r.cb.Execute(func() (any, error) {
 		var userID int64
-		err := gtk.MapNoRows(r.db.QueryRow(ctx, `
+		err := postgres.MapNoRows(r.db.QueryRow(ctx, `
 			SELECT user_id FROM sessions
 			WHERE token_hash = $1 AND expires_at > $2 AND deleted_at IS NULL`,
 			tokenHash, time.Now(),
 		).Scan(&userID))
 		if err != nil {
-			if errors.Is(err, &gtk.RecordNotFoundError{}) {
+			if errors.Is(err, &postgres.RecordNotFoundError{}) {
 				return tokenResult{false, 0}, nil
 			}
 			return nil, err

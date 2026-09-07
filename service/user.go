@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/arpansaha13/gotoolkit/postgres"
+
 	"github.com/arpansaha13/gotoolkit/gtk"
 )
 
@@ -39,7 +41,7 @@ func (s *AuthService) GetUser(ctx context.Context, req GetUserRequest) (*GetUser
 			return nil, err
 		}
 		if user == nil {
-			return nil, &gtk.RecordNotFoundError{}
+			return nil, &postgres.RecordNotFoundError{}
 		}
 
 		username := ""

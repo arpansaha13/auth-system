@@ -8,7 +8,7 @@ import (
 	"github.com/arpansaha13/goauthkit/service"
 	"github.com/arpansaha13/goauthkit/utils"
 	"github.com/arpansaha13/gotoolkit/gtk"
-	"github.com/gorilla/mux"
+	"github.com/arpansaha13/gotoolkit/httpx"
 )
 
 // CookieConfig holds settings for session cookies
@@ -54,7 +54,7 @@ func NewAuthController(
 }
 
 // Signup handles user registration.
-func (c *AuthController) Signup(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *AuthController) Signup(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	var payload utils.SignupPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		return nil, &gtk.ValidationError{Message: "invalid request body", Field: "body"}
@@ -75,14 +75,14 @@ func (c *AuthController) Signup(w http.ResponseWriter, r *http.Request) (*gtk.Co
 		return nil, err
 	}
 
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusCreated,
 		Body:       resp,
 	}, nil
 }
 
 // Login handles user login.
-func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	var payload utils.LoginPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		return nil, &gtk.ValidationError{Message: "invalid request body", Field: "body"}
@@ -104,14 +104,14 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) (*gtk.Con
 
 	setSessionCookie(w, c.cookieConfig, resp.SessionToken, resp.ExpiresAt)
 
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusOK,
 		Body:       resp,
 	}, nil
 }
 
 // VerifyOTP handles OTP verification.
-func (c *AuthController) VerifyOTP(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *AuthController) VerifyOTP(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	var payload utils.VerifyOTPPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		return nil, &gtk.ValidationError{Message: "invalid request body", Field: "body"}
@@ -119,9 +119,8 @@ func (c *AuthController) VerifyOTP(w http.ResponseWriter, r *http.Request) (*gtk
 
 	if err := c.validator.Validate(payload); err != nil {
 		// If validation failed, check if hash is in URL params
-		vars := mux.Vars(r)
-		if vars["otpHash"] != "" {
-			payload.OTPHash = vars["otpHash"]
+		if h := r.PathValue("otpHash"); h != "" {
+			payload.OTPHash = h
 			// Re-validate
 			if err := c.validator.Validate(payload); err != nil {
 				return nil, &gtk.ValidationError{Message: err.Error()}
@@ -143,14 +142,14 @@ func (c *AuthController) VerifyOTP(w http.ResponseWriter, r *http.Request) (*gtk
 
 	setSessionCookie(w, c.cookieConfig, resp.SessionToken, resp.ExpiresAt)
 
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusOK,
 		Body:       resp,
 	}, nil
 }
 
 // Logout handles user logout.
-func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) (*gtk.ControllerResponse, error) {
+func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) (*httpx.ControllerResponse, error) {
 	// Token is extracted by middleware and put into context
 	token, ok := r.Context().Value("authorization").(string)
 	if !ok || token == "" {
@@ -168,7 +167,7 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) (*gtk.Co
 
 	clearSessionCookie(w, c.cookieConfig)
 
-	return &gtk.ControllerResponse{
+	return &httpx.ControllerResponse{
 		StatusCode: http.StatusOK,
 		Body:       resp,
 	}, nil

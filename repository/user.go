@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/arpansaha13/gotoolkit/gtk"
+	"github.com/arpansaha13/gotoolkit/postgres"
 	"github.com/sony/gobreaker/v2"
 
 	"github.com/arpansaha13/goauthkit/domain"
 )
 
 type UserRepository struct {
-	db *gtk.PostgresClient
+	db *postgres.PostgresClient
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewUserRepository(db *gtk.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *UserRepository {
+func NewUserRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *UserRepository {
 	return &UserRepository{db: db, cb: cb}
 }
 
@@ -65,7 +66,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*d
 func (r *UserRepository) getUser(ctx context.Context, query string, arg any, notFoundMsg string) (*domain.User, error) {
 	result, err := r.cb.Execute(func() (any, error) {
 		var user domain.User
-		err := gtk.MapNoRows(r.db.QueryRow(ctx, query, arg).Scan(
+		err := postgres.MapNoRows(r.db.QueryRow(ctx, query, arg).Scan(
 			&user.ID, &user.Email, &user.Username, &user.Verified, &user.LastLogin, &user.CreatedAt,
 		))
 		if err != nil {
@@ -77,7 +78,7 @@ func (r *UserRepository) getUser(ctx context.Context, query string, arg any, not
 		return &user, nil
 	})
 	if err != nil {
-		if errors.Is(err, &gtk.RecordNotFoundError{}) {
+		if errors.Is(err, &postgres.RecordNotFoundError{}) {
 			return nil, &gtk.NotFoundError{Message: notFoundMsg}
 		}
 		return nil, &gtk.InternalError{Message: "failed to get user", Err: err}
@@ -87,23 +88,23 @@ func (r *UserRepository) getUser(ctx context.Context, query string, arg any, not
 
 func (r *UserRepository) loadRelations(ctx context.Context, user *domain.User) error {
 	var creds domain.Credentials
-	err := gtk.MapNoRows(r.db.QueryRow(ctx, `SELECT user_id, password_hash FROM credentials WHERE user_id = $1`, user.ID).
+	err := postgres.MapNoRows(r.db.QueryRow(ctx, `SELECT user_id, password_hash FROM credentials WHERE user_id = $1`, user.ID).
 		Scan(&creds.UserID, &creds.PasswordHash))
 	if err == nil {
 		user.Credentials = &creds
-	} else if !errors.Is(err, &gtk.RecordNotFoundError{}) {
+	} else if !errors.Is(err, &postgres.RecordNotFoundError{}) {
 		return err
 	}
 
 	var otp domain.OTP
-	err = gtk.MapNoRows(r.db.QueryRow(ctx, `
+	err = postgres.MapNoRows(r.db.QueryRow(ctx, `
 		SELECT id, user_id, otp_hash, hashed_code, purpose, expires_at, deleted_at, created_at
 		FROM otps WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC LIMIT 1`, user.ID,
 	).Scan(&otp.ID, &otp.UserID, &otp.OTPHash, &otp.HashedCode, &otp.Purpose, &otp.ExpiresAt, &otp.DeletedAt, &otp.CreatedAt))
 	if err == nil {
 		user.OTP = &otp
-	} else if !errors.Is(err, &gtk.RecordNotFoundError{}) {
+	} else if !errors.Is(err, &postgres.RecordNotFoundError{}) {
 		return err
 	}
 	return nil
