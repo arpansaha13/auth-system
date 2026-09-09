@@ -13,11 +13,11 @@ import (
 )
 
 type OTPRepository struct {
-	db *postgres.PostgresClient
+	db *postgres.Client
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewOTPRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *OTPRepository {
+func NewOTPRepository(db *postgres.Client, cb *gobreaker.CircuitBreaker[any]) *OTPRepository {
 	return &OTPRepository{db: db, cb: cb}
 }
 

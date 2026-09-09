@@ -13,11 +13,11 @@ import (
 )
 
 type SessionRepository struct {
-	db *postgres.PostgresClient
+	db *postgres.Client
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewSessionRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *SessionRepository {
+func NewSessionRepository(db *postgres.Client, cb *gobreaker.CircuitBreaker[any]) *SessionRepository {
 	return &SessionRepository{db: db, cb: cb}
 }
 

@@ -17,12 +17,12 @@ import (
 // MemcachedSessionCache implements ISessionCache using memcached as the backend.
 // Circuit protection lives on the memcached client.
 type MemcachedSessionCache struct {
-	client *memcached.MemcachedClient
+	client *memcached.Client
 }
 
 // NewMemcachedSessionCache creates a new session cache with a memcached client wrapper.
 // If client is nil, operations become no-ops (graceful degradation).
-func NewMemcachedSessionCache(client *memcached.MemcachedClient) *MemcachedSessionCache {
+func NewMemcachedSessionCache(client *memcached.Client) *MemcachedSessionCache {
 	return &MemcachedSessionCache{client: client}
 }
 

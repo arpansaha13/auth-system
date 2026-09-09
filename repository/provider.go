@@ -13,11 +13,11 @@ import (
 )
 
 type ProviderRepository struct {
-	db *postgres.PostgresClient
+	db *postgres.Client
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewProviderRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *ProviderRepository {
+func NewProviderRepository(db *postgres.Client, cb *gobreaker.CircuitBreaker[any]) *ProviderRepository {
 	return &ProviderRepository{db: db, cb: cb}
 }
 

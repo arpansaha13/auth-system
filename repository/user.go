@@ -13,11 +13,11 @@ import (
 )
 
 type UserRepository struct {
-	db *postgres.PostgresClient
+	db *postgres.Client
 	cb *gobreaker.CircuitBreaker[any]
 }
 
-func NewUserRepository(db *postgres.PostgresClient, cb *gobreaker.CircuitBreaker[any]) *UserRepository {
+func NewUserRepository(db *postgres.Client, cb *gobreaker.CircuitBreaker[any]) *UserRepository {
 	return &UserRepository{db: db, cb: cb}
 }
 
