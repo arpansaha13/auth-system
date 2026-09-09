@@ -32,7 +32,7 @@ func (c *MemcachedSessionCache) GetSessionByToken(ctx context.Context, tokenHash
 		return nil, &gtk.NotFoundError{Message: "cache not available"}
 	}
 
-	item, err := c.client.Get(fmt.Sprintf("session:%s", tokenHash))
+	item, err := c.client.Get(ctx, fmt.Sprintf("session:%s", tokenHash))
 	if err != nil {
 		if errors.Is(err, memcache.ErrCacheMiss) {
 			return nil, &gtk.NotFoundError{Message: "session not found in cache"}
@@ -54,7 +54,7 @@ func (c *MemcachedSessionCache) IsTokenValid(ctx context.Context, tokenHash stri
 		return false, 0, &gtk.NotFoundError{Message: "cache not available"}
 	}
 
-	item, err := c.client.Get(fmt.Sprintf("token_valid:%s", tokenHash))
+	item, err := c.client.Get(ctx, fmt.Sprintf("token_valid:%s", tokenHash))
 	if err != nil {
 		if errors.Is(err, memcache.ErrCacheMiss) {
 			return false, 0, &gtk.NotFoundError{Message: "token validity not found in cache"}
@@ -91,7 +91,7 @@ func (c *MemcachedSessionCache) SetSession(ctx context.Context, tokenHash string
 		ttlSeconds = 1
 	}
 
-	if err := c.client.Set(&memcache.Item{
+	if err := c.client.Set(ctx, &memcache.Item{
 		Key:        fmt.Sprintf("session:%s", tokenHash),
 		Value:      sessionJSON,
 		Expiration: ttlSeconds,
@@ -107,7 +107,7 @@ func (c *MemcachedSessionCache) SetSession(ctx context.Context, tokenHash string
 		return fmt.Errorf("failed to marshal token validity: %w", err)
 	}
 
-	if err := c.client.Set(&memcache.Item{
+	if err := c.client.Set(ctx, &memcache.Item{
 		Key:        fmt.Sprintf("token_valid:%s", tokenHash),
 		Value:      tokenValidData,
 		Expiration: ttlSeconds,
@@ -126,7 +126,7 @@ func (c *MemcachedSessionCache) InvalidateSessionToken(ctx context.Context, toke
 	}
 
 	deleteCacheKey := func(key string) error {
-		err := c.client.Delete(key)
+		err := c.client.Delete(ctx, key)
 		if err != nil && !errors.Is(err, memcache.ErrCacheMiss) {
 			return err
 		}

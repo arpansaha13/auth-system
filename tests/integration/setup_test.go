@@ -72,7 +72,7 @@ func (s *AuthIntegrationTestSuite) SetupSuite() {
 	port, _ := container.MappedPort(ctx, "5432")
 	dsn := fmt.Sprintf("postgres://testuser:testpass@%s:%s/test_auth_integration?sslmode=disable", host, port.Port())
 
-	pg := postgres.NewClient(ctx, postgres.ClientConfig{DatabaseURL: dsn})
+	pg := postgres.NewClient(ctx, dsn)
 	s.Require().NoError(pg.Start(), "Failed to connect to database")
 	s.DB = pg.Pool()
 
